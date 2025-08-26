@@ -1,0 +1,5 @@
+rootProject.name = 'turtlebot3-web-simulator'
+
+include 'backend:rcp-base'
+include 'backend:rcp-app'
+include 'frontend'

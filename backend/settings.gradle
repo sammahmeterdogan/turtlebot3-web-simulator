@@ -1,0 +1,3 @@
+rootProject.name = 'rcp'
+include 'rcp-base'
+include 'rcp-app'

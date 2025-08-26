@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: rcp-app
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/turtlebot_sim}
+    username: ${DB_USERNAME:turtlebot}
+    password: ${DB_PASSWORD:turtlebot123}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+ros:
+  docker:  # (not: buradaki açıklama satırı '#' ile olmalı)
+    host: ${DOCKER_HOST:unix:///var/run/docker.sock}
+    compose-file: ${COMPOSE_FILE:./ros-stack/docker-compose.yml}
+    network: ${DOCKER_NETWORK:turtlebot-network}
+  bridge:
+    url: ${ROSBRIDGE_URL:ws://localhost:9090}
+    reconnect-interval: 5000
+  video:
+    stream-url: ${VIDEO_STREAM_URL:http://localhost:8080}
+  simulation:
+    default-model: ${DEFAULT_MODEL:burger}
+    startup-timeout: 30000
+    health-check-interval: 2000
+
+cors:
+  allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+
+logging:
+  level:
+    com.samma.rcp: DEBUG
+    org.springframework.web: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

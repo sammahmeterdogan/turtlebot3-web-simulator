@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: turtlebot3-postgres
+    environment:
+      POSTGRES_DB: turtlebot3_sim
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - turtlebot3-network
+
+  # Backend Application
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: turtlebot3-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/turtlebot3_sim
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - turtlebot3-network
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: turtlebot3-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - turtlebot3-network
+
+  # ROS Stack (from ros-stack directory)
+  ros-master:
+    image: ros:noetic-ros-core
+    container_name: turtlebot3-ros-master
+    command: roscore
+    networks:
+      - turtlebot3-network
+
+  gazebo:
+    image: osrf/gazebo:gazebo11
+    container_name: turtlebot3-gazebo
+    environment:
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ./ros-stack/worlds:/opt/ros/worlds
+    ports:
+      - "11345:11345"
+    depends_on:
+      - ros-master
+    networks:
+      - turtlebot3-network
+
+volumes:
+  postgres_data:
+
+
+networks:
+  turtlebot3-network:
+    driver: bridge
