@@ -16,36 +16,42 @@ import {
 import { rosClient } from '../../services/rosClient'
 import { wsService } from '../../services/ws'
 
+// Menu items - sabit renk sınıfları kullanın
 const menuItems = [
     {
         path: '/dashboard',
         name: 'Dashboard',
         icon: LayoutDashboard,
         color: 'text-blue-400',
+        activeColor: 'text-blue-400',
     },
     {
         path: '/simulator',
         name: 'Simulator',
         icon: Cpu,
         color: 'text-green-400',
+        activeColor: 'text-green-400',
     },
     {
         path: '/examples',
         name: 'Examples',
         icon: Grid3x3,
         color: 'text-purple-400',
+        activeColor: 'text-purple-400',
     },
     {
         path: '/maps',
         name: 'Maps',
         icon: Map,
         color: 'text-orange-400',
+        activeColor: 'text-orange-400',
     },
     {
         path: '/settings',
         name: 'Settings',
         icon: Settings,
         color: 'text-gray-400',
+        activeColor: 'text-gray-400',
     },
 ]
 
@@ -54,20 +60,38 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
     const [wsConnected, setWsConnected] = React.useState(false)
 
     React.useEffect(() => {
+        // Bağlantı durumlarını kontrol et
         const checkConnections = () => {
             setRosConnected(rosClient.isConnected())
             setWsConnected(wsService.isConnected())
         }
 
+        // İlk kontrol
         checkConnections()
+
+        // Periyodik kontrol
         const interval = setInterval(checkConnections, 2000)
 
-        rosClient.addListener((event) => {
-            if (event === 'connected') setRosConnected(true)
-            if (event === 'disconnected') setRosConnected(false)
+        // ROS bağlantı durumunu dinle - düzeltilmiş
+        const removeRosListener = rosClient.addListener((event) => {
+            if (event === 'connected') {
+                setRosConnected(true)
+            } else if (event === 'disconnected') {
+                setRosConnected(false)
+            }
         })
 
-        return () => clearInterval(interval)
+        // State değişikliklerini dinle
+        const removeStateListener = rosClient.onStateChange((state) => {
+            setRosConnected(state === 'CONNECTED')
+        })
+
+        // Cleanup
+        return () => {
+            clearInterval(interval)
+            if (removeRosListener) removeRosListener()
+            if (removeStateListener) removeStateListener()
+        }
     }, [])
 
     return (
@@ -84,7 +108,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                     animate={{ justifyContent: isCollapsed ? 'center' : 'flex-start' }}
                 >
                     <div className="relative">
-                        <Bot className="w-8 h-8 text-primary-500" />
+                        <Bot className="w-8 h-8 text-blue-500" />
                         <motion.div
                             className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full"
                             animate={{ scale: [1, 1.2, 1] }}
@@ -107,6 +131,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             {/* Connection Status */}
             <div className="px-6 py-4 border-b border-gray-800">
                 <div className={`space-y-3 ${isCollapsed ? 'items-center' : ''}`}>
+                    {/* ROS Connection */}
                     <motion.div
                         className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`}
                         whileHover={{ scale: 1.05 }}
@@ -118,11 +143,12 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                         )}
                         {!isCollapsed && (
                             <span className={`text-xs font-medium ${rosConnected ? 'text-green-400' : 'text-red-400'}`}>
-                ROS {rosConnected ? 'Connected' : 'Disconnected'}
-              </span>
+                                ROS {rosConnected ? 'Connected' : 'Disconnected'}
+                            </span>
                         )}
                     </motion.div>
 
+                    {/* WebSocket Connection */}
                     <motion.div
                         className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`}
                         whileHover={{ scale: 1.05 }}
@@ -134,8 +160,8 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                         )}
                         {!isCollapsed && (
                             <span className={`text-xs font-medium ${wsConnected ? 'text-green-400' : 'text-red-400'}`}>
-                WebSocket {wsConnected ? 'Active' : 'Inactive'}
-              </span>
+                                WebSocket {wsConnected ? 'Active' : 'Inactive'}
+                            </span>
                         )}
                     </motion.div>
                 </div>
@@ -149,8 +175,8 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                         to={item.path}
                         className={({ isActive }) =>
                             `flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 group
-              ${isActive
-                                ? 'bg-primary-600/20 text-primary-400 shadow-lg shadow-primary-500/20'
+                            ${isActive
+                                ? 'bg-blue-600/20 text-blue-400 shadow-lg shadow-blue-500/20'
                                 : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                             } ${isCollapsed ? 'justify-center' : ''}`
                         }
@@ -158,7 +184,11 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                         {({ isActive }) => (
                             <>
                                 <item.icon
-                                    className={`w-5 h-5 ${isActive ? item.color : 'group-hover:text-white'}`}
+                                    className={`w-5 h-5 ${
+                                        isActive
+                                            ? item.activeColor
+                                            : 'group-hover:text-white'
+                                    }`}
                                 />
                                 {!isCollapsed && (
                                     <motion.span
@@ -172,7 +202,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
                                 )}
                                 {!isCollapsed && isActive && (
                                     <motion.div
-                                        className="ml-auto w-2 h-2 bg-primary-400 rounded-full"
+                                        className="ml-auto w-2 h-2 bg-blue-400 rounded-full"
                                         initial={{ scale: 0 }}
                                         animate={{ scale: 1 }}
                                         transition={{ type: 'spring' }}

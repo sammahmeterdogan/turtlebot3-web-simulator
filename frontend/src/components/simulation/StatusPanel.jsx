@@ -1,116 +1,206 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import {
-    Circle,
-    CheckCircle,
-    XCircle,
-    AlertCircle,
-    Loader,
-    Wifi,
-    WifiOff,
     Activity,
-    Zap
+    Battery,
+    Cpu,
+    Navigation,
+    Gauge,
+    MapPin,
+    Zap,
+    AlertCircle,
+    CheckCircle,
+    Clock
 } from 'lucide-react'
 
-const StatusPanel = ({ status, model, scenario }) => {
-    const getStatusIcon = () => {
-        switch (status) {
-            case 'RUNNING':
-                return <CheckCircle className="w-5 h-5 text-green-400" />
-            case 'STOPPED':
-                return <XCircle className="w-5 h-5 text-red-400" />
-            case 'STARTING':
-            case 'STOPPING':
-                return <Loader className="w-5 h-5 text-yellow-400 animate-spin" />
-            case 'ERROR':
-                return <AlertCircle className="w-5 h-5 text-red-400" />
-            default:
-                return <Circle className="w-5 h-5 text-gray-400" />
-        }
-    }
-
-    const getStatusColor = () => {
-        switch (status) {
-            case 'RUNNING': return 'text-green-400 bg-green-900/50 border-green-800'
-            case 'STOPPED': return 'text-red-400 bg-red-900/50 border-red-800'
-            case 'STARTING':
-            case 'STOPPING': return 'text-yellow-400 bg-yellow-900/50 border-yellow-800'
-            case 'ERROR': return 'text-red-400 bg-red-900/50 border-red-800'
-            default: return 'text-gray-400 bg-gray-900/50 border-gray-800'
-        }
+const StatusIndicator = ({ status, label, color = 'gray' }) => {
+    const colors = {
+        green: 'bg-green-500',
+        red: 'bg-red-500',
+        yellow: 'bg-yellow-500',
+        blue: 'bg-blue-500',
+        gray: 'bg-gray-500'
     }
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-primary-400" />
-                Simulation Status
-            </h3>
+        <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${colors[color]} animate-pulse`} />
+            <span className="text-xs text-gray-400">{label}</span>
+            <span className="text-xs text-white font-medium">{status}</span>
+        </div>
+    )
+}
 
-            <div className="space-y-3">
-                {/* Main Status */}
-                <div className={`border rounded-lg p-3 ${getStatusColor()}`}>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            {getStatusIcon()}
-                            <span className="font-medium">{status}</span>
-                        </div>
-                        {status === 'RUNNING' && (
-                            <motion.div
-                                className="w-2 h-2 bg-green-400 rounded-full"
-                                animate={{ scale: [1, 1.2, 1] }}
-                                transition={{ repeat: Infinity, duration: 2 }}
-                            />
-                        )}
-                    </div>
+const MetricCard = ({ icon: Icon, title, value, unit, color = 'blue' }) => {
+    const colorClasses = {
+        blue: 'text-blue-400 bg-blue-500/10',
+        green: 'text-green-400 bg-green-500/10',
+        orange: 'text-orange-400 bg-orange-500/10',
+        red: 'text-red-400 bg-red-500/10',
+        purple: 'text-purple-400 bg-purple-500/10'
+    }
+
+    return (
+        <div className="bg-gray-800/50 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+                <div className={`p-1.5 rounded-lg ${colorClasses[color].split(' ')[1]}`}>
+                    <Icon className={`w-3 h-3 ${colorClasses[color].split(' ')[0]}`} />
                 </div>
+                <span className="text-xs text-gray-400">{title}</span>
+            </div>
+            <div className="text-lg font-bold text-white">
+                {value}
+                {unit && <span className="text-sm text-gray-400 ml-1">{unit}</span>}
+            </div>
+        </div>
+    )
+}
 
-                {/* Model & Scenario */}
-                <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-gray-800 rounded-lg p-2">
-                        <p className="text-xs text-gray-500 mb-1">Model</p>
-                        <p className="text-sm text-white font-medium capitalize">
-                            {model?.replace('_', ' ') || 'Not selected'}
-                        </p>
-                    </div>
-                    <div className="bg-gray-800 rounded-lg p-2">
-                        <p className="text-xs text-gray-500 mb-1">Scenario</p>
-                        <p className="text-sm text-white font-medium">
-                            {scenario?.replace('_', ' ') || 'Not selected'}
-                        </p>
-                    </div>
+const StatusPanel = ({ status = 'STOPPED', telemetryData = {}, isRunning = false }) => {
+    // Default telemetry data
+    const telemetry = {
+        pose: { x: 0, y: 0, theta: 0 },
+        velocity: { linear: 0, angular: 0 },
+        battery: 100,
+        status: 'IDLE',
+        ...telemetryData
+    }
+
+    // Status color mapping
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'RUNNING': return 'green'
+            case 'STOPPED': return 'gray'
+            case 'ERROR': return 'red'
+            case 'STARTING': return 'yellow'
+            case 'STOPPING': return 'yellow'
+            default: return 'gray'
+        }
+    }
+
+    // Battery level color
+    const getBatteryColor = (level) => {
+        if (level > 60) return 'green'
+        if (level > 30) return 'yellow'
+        return 'red'
+    }
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-900 border border-gray-800 rounded-xl p-4"
+        >
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-semibold flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-blue-400" />
+                    System Status
+                </h3>
+                {isRunning ? (
+                    <CheckCircle className="w-5 h-5 text-green-400" />
+                ) : (
+                    <AlertCircle className="w-5 h-5 text-gray-400" />
+                )}
+            </div>
+
+            {/* Status Indicators */}
+            <div className="space-y-3 mb-4">
+                <StatusIndicator
+                    status={status}
+                    label="Simulation"
+                    color={getStatusColor(status)}
+                />
+                <StatusIndicator
+                    status={telemetry.status}
+                    label="Robot State"
+                    color={isRunning ? 'blue' : 'gray'}
+                />
+                <StatusIndicator
+                    status={isRunning ? 'Active' : 'Inactive'}
+                    label="Control"
+                    color={isRunning ? 'green' : 'gray'}
+                />
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+                <MetricCard
+                    icon={Battery}
+                    title="Battery"
+                    value={telemetry.battery || 100}
+                    unit="%"
+                    color={getBatteryColor(telemetry.battery || 100)}
+                />
+                <MetricCard
+                    icon={Gauge}
+                    title="Speed"
+                    value={Math.abs(telemetry.velocity?.linear || 0).toFixed(2)}
+                    unit="m/s"
+                    color="blue"
+                />
+            </div>
+
+            {/* Position Information */}
+            <div className="bg-gray-800/30 rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                    <MapPin className="w-3 h-3 text-purple-400" />
+                    <span className="text-xs text-gray-400">Position</span>
                 </div>
-
-                {/* Connection Status */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-gray-800 rounded-lg">
-                        <div className="flex items-center gap-2">
-                            <Wifi className="w-4 h-4 text-gray-400" />
-                            <span className="text-xs text-gray-400">ROS Bridge</span>
-                        </div>
-                        <span className="text-xs text-green-400">Connected</span>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                        <span className="text-gray-500">X:</span>
+                        <span className="ml-1 text-white font-mono">
+                            {(telemetry.pose?.x || 0).toFixed(2)}
+                        </span>
                     </div>
-
-                    <div className="flex items-center justify-between p-2 bg-gray-800 rounded-lg">
-                        <div className="flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-gray-400" />
-                            <span className="text-xs text-gray-400">WebSocket</span>
-                        </div>
-                        <span className="text-xs text-green-400">Active</span>
+                    <div>
+                        <span className="text-gray-500">Y:</span>
+                        <span className="ml-1 text-white font-mono">
+                            {(telemetry.pose?.y || 0).toFixed(2)}
+                        </span>
                     </div>
-
-                    <div className="flex items-center justify-between p-2 bg-gray-800 rounded-lg">
-                        <div className="flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-gray-400" />
-                            <span className="text-xs text-gray-400">Gazebo</span>
-                        </div>
-                        <span className={`text-xs ${status === 'RUNNING' ? 'text-green-400' : 'text-gray-500'}`}>
-              {status === 'RUNNING' ? 'Running' : 'Idle'}
-            </span>
+                    <div>
+                        <span className="text-gray-500">θ:</span>
+                        <span className="ml-1 text-white font-mono">
+                            {((telemetry.pose?.theta || 0) * 180 / Math.PI).toFixed(0)}°
+                        </span>
                     </div>
                 </div>
             </div>
-        </div>
+
+            {/* Velocity Information */}
+            <div className="bg-gray-800/30 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                    <Navigation className="w-3 h-3 text-blue-400" />
+                    <span className="text-xs text-gray-400">Velocity</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                        <span className="text-gray-500">Linear:</span>
+                        <span className="ml-1 text-white font-mono">
+                            {(telemetry.velocity?.linear || 0).toFixed(2)} m/s
+                        </span>
+                    </div>
+                    <div>
+                        <span className="text-gray-500">Angular:</span>
+                        <span className="ml-1 text-white font-mono">
+                            {(telemetry.velocity?.angular || 0).toFixed(2)} rad/s
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Connection Status at bottom */}
+            <div className="mt-4 pt-3 border-t border-gray-800">
+                <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">Last Update:</span>
+                    <span className="text-gray-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date().toLocaleTimeString()}
+                    </span>
+                </div>
+            </div>
+        </motion.div>
     )
 }
 

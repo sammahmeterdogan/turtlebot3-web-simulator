@@ -1,189 +1,263 @@
 import ROSLIB from 'roslib'
 
-class RosClient {
-    constructor() {
-        this.ros = null
-        this.connected = false
-        this.topics = new Map()
-        this.services = new Map()
-        this.reconnectAttempts = 0
-        this.maxReconnectAttempts = 5
-        this.reconnectDelay = 2000
-        this.listeners = new Set()
+const DEFAULT_URL = (import.meta.env && import.meta.env.VITE_ROSBRIDGE_URL) || '/rosbridge'
+
+function toWsUrl(input) {
+    const val = (input || DEFAULT_URL).trim()
+    if (val.startsWith('/')) {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        return `${proto}//${window.location.host}${val}`
     }
-
-    connect(url = 'ws://localhost:9090') {
-        return new Promise((resolve, reject) => {
-            if (this.ros) this.ros.close()
-
-            this.ros = new ROSLIB.Ros({ url })
-
-            this.ros.on('connection', () => {
-                this.connected = true
-                this.reconnectAttempts = 0
-                this.notifyListeners('connected')
-                resolve()
-            })
-
-            this.ros.on('error', (error) => {
-                this.connected = false
-                this.notifyListeners('error', error)
-                reject(error)
-            })
-
-            this.ros.on('close', () => {
-                this.connected = false
-                this.notifyListeners('disconnected')
-                this.attemptReconnect(url)
-            })
-        })
-    }
-
-    disconnect() {
-        if (this.ros) {
-            this.topics.forEach((t) => t.unsubscribe())
-            this.topics.clear()
-            this.services.clear()
-            this.ros.close()
-            this.ros = null
-        }
-        this.connected = false
-        this.reconnectAttempts = 0
-    }
-
-    attemptReconnect(url) {
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++
-            setTimeout(() => this.connect(url).catch(() => {}), this.reconnectDelay)
-        }
-    }
-
-    // Event listeners
-    addListener(callback) { this.listeners.add(callback) }
-    removeListener(callback) { this.listeners.delete(callback) }
-    notifyListeners(event, data) { this.listeners.forEach(cb => cb(event, data)) }
-
-    // Topic operations
-    subscribeTopic(topicName, messageType, callback) {
-        if (!this.ros) {
-            console.error('ROS not connected')
-            return null
-        }
-        // reuse if already created
-        let topic = this.topics.get(topicName)
-        if (!topic) {
-            topic = new ROSLIB.Topic({ ros: this.ros, name: topicName, messageType })
-            this.topics.set(topicName, topic)
-        }
-        topic.subscribe(callback)
-        return topic
-    }
-
-    unsubscribeTopic(topicName) {
-        const topic = this.topics.get(topicName)
-        if (topic) {
-            topic.unsubscribe()
-            this.topics.delete(topicName)
-        }
-    }
-
-    publishTopic(topicName, messageType, message) {
-        if (!this.ros) {
-            console.error('ROS not connected')
-            return
-        }
-        let topic = this.topics.get(topicName)
-        if (!topic) {
-            topic = new ROSLIB.Topic({ ros: this.ros, name: topicName, messageType })
-            this.topics.set(topicName, topic)
-        }
-        const rosMessage = new ROSLIB.Message(message)
-        topic.publish(rosMessage)
-    }
-
-    // Service operations
-    callService(serviceName, serviceType, request) {
-        return new Promise((resolve, reject) => {
-            if (!this.ros) {
-                reject(new Error('ROS not connected'))
-                return
-            }
-            let service = this.services.get(serviceName)
-            if (!service) {
-                service = new ROSLIB.Service({ ros: this.ros, name: serviceName, serviceType })
-                this.services.set(serviceName, service)
-            }
-            const serviceRequest = new ROSLIB.ServiceRequest(request)
-            service.callService(
-                (res) => resolve(res),
-                (err) => reject(err),
-                serviceRequest
-            )
-        })
-    }
-
-    // Introspection
-    getTopics() {
-        return new Promise((resolve, reject) => {
-            if (!this.ros) return reject(new Error('ROS not connected'))
-            this.ros.getTopics(
-                (topics) => resolve(topics),
-                (error) => reject(error)
-            )
-        })
-    }
-
-    getServices() {
-        return new Promise((resolve, reject) => {
-            if (!this.ros) return reject(new Error('ROS not connected'))
-            this.ros.getServices(
-                (services) => resolve(services),
-                (error) => reject(error)
-            )
-        })
-    }
-
-    getNodes() {
-        return new Promise((resolve, reject) => {
-            if (!this.ros) return reject(new Error('ROS not connected'))
-            this.ros.getNodes(
-                (nodes) => resolve(nodes),
-                (error) => reject(error)
-            )
-        })
-    }
-
-    isConnected() { return this.connected }
+    if (val.startsWith('http://'))  return 'ws://'  + val.slice(7)
+    if (val.startsWith('https://')) return 'wss://' + val.slice(8)
+    return val // already ws:// or wss://
 }
 
-export const rosClient = new RosClient()
+let ros = null
+let connectPromise = null
+let state = 'DISCONNECTED' // DISCONNECTED | CONNECTING | CONNECTED
+const topics = new Map()
+const statusListeners = new Set()
+const connectionListeners = new Set() // Sidebar.jsx için
+let reconnectAttempts = 0
+const maxReconnectAttempts = 5
+let reconnectTimer = null
+let destroyed = false
 
-// Convenience publishers
-export const publishCmdVel = (linear, angular) => {
-    rosClient.publishTopic('/cmd_vel', 'geometry_msgs/Twist', {
+function setState(next) {
+    if (state === next) return
+    const prevState = state
+    state = next
+
+    // State change listeners'lara bildir
+    for (const cb of statusListeners) {
+        try { cb(state) } catch (e) { console.warn('State listener error:', e) }
+    }
+
+    // Connection event listeners'lara bildir (Sidebar.jsx için)
+    const event = state === 'CONNECTED' ? 'connected' : 'disconnected'
+    for (const cb of connectionListeners) {
+        try { cb(event) } catch (e) { console.warn('Connection listener error:', e) }
+    }
+}
+
+function cleanupConnHandlers(target, handlers) {
+    if (!target) return
+    for (const [evt, fn] of handlers) {
+        try {
+            const offFn = target.off || target.removeListener
+            offFn && offFn.call(target, evt, fn)
+        } catch {}
+    }
+}
+
+function connect(url) {
+    if (destroyed) return Promise.reject(new Error('ROS client destroyed'))
+
+    const wsUrl = toWsUrl(url)
+    if (ros && ros.socket && ros.socket.readyState === 1) return Promise.resolve(ros)
+    if (connectPromise) return connectPromise
+
+    setState('CONNECTING')
+    ros = new ROSLIB.Ros({ url: wsUrl })
+
+    connectPromise = new Promise((resolve, reject) => {
+        const onOpen = () => {
+            cleanupConnHandlers(ros, handlers)
+            reconnectAttempts = 0
+            setState('CONNECTED')
+            connectPromise = null
+            resolve(ros)
+        }
+        const onError = (e) => {
+            cleanupConnHandlers(ros, handlers)
+            setState('DISCONNECTED')
+            connectPromise = null
+            reject(e)
+        }
+        const onClose = () => {
+            cleanupConnHandlers(ros, handlers)
+            setState('DISCONNECTED')
+            connectPromise = null
+            if (destroyed) return
+            if (reconnectAttempts >= maxReconnectAttempts) return
+            reconnectAttempts += 1
+            const delay = 2000 * Math.pow(2, reconnectAttempts - 1)
+            reconnectTimer = setTimeout(() => { if (!destroyed) connect(wsUrl).catch(() => {}) }, delay)
+        }
+
+        const handlers = [
+            ['connection', onOpen],
+            ['error', onError],
+            ['close', onClose],
+        ]
+        handlers.forEach(([evt, fn]) => ros.on(evt, fn))
+    })
+
+    return connectPromise
+}
+
+function disconnect() {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    topics.forEach((t) => { try { t.unsubscribe?.() } catch {}; try { t.unadvertise?.() } catch {} })
+    topics.clear()
+    try { ros?.close() } catch {}
+    ros = null
+    setState('DISCONNECTED')
+}
+
+function destroy() {
+    destroyed = true
+    disconnect()
+    statusListeners.clear()
+    connectionListeners.clear()
+}
+
+function isConnected() {
+    return !!(ros && ros.socket && ros.socket.readyState === 1)
+}
+
+function getConnectionStatus() {
+    return {
+        connected: isConnected(),
+        reconnectAttempts,
+        maxReconnectAttempts,
+        state
+    }
+}
+
+function onStateChange(cb) {
+    if (typeof cb === 'function') statusListeners.add(cb)
+    return () => statusListeners.delete(cb)
+}
+
+// Sidebar.jsx için event listener sistemi
+function addListener(cb) {
+    if (typeof cb === 'function') {
+        connectionListeners.add(cb)
+    }
+    // Cleanup function döndür
+    return () => connectionListeners.delete(cb)
+}
+
+function removeListener(cb) {
+    connectionListeners.delete(cb)
+}
+
+function subscribeTopic(name, messageType, cb, opts = {}) {
+    if (!ros) {
+        console.error('ROS not connected')
+        return null
+    }
+    const key = `sub:${name}:${messageType}`
+    if (topics.has(key)) {
+        const t = topics.get(key)
+        if (cb) t.subscribe(cb)
+        return t
+    }
+    const t = new ROSLIB.Topic({
+        ros,
+        name,
+        messageType,
+        throttle_rate: opts.throttle_rate ?? 100,
+    })
+    if (cb) t.subscribe(cb)
+    topics.set(key, t)
+    return t
+}
+
+function unsubscribeTopic(name) {
+    for (const [key, t] of Array.from(topics.entries())) {
+        if (key.startsWith(`sub:${name}:`) || key.startsWith(`pub:${name}:`)) {
+            try { t.unsubscribe?.() } catch {}
+            try { t.unadvertise?.() } catch {}
+            topics.delete(key)
+        }
+    }
+}
+
+function publishTopic(name, messageType, message) {
+    if (!ros) {
+        console.error('ROS not connected')
+        return
+    }
+    const key = `pub:${name}:${messageType}`
+    let t = topics.get(key)
+    if (!t) {
+        t = new ROSLIB.Topic({ ros, name, messageType })
+        try { t.advertise?.() } catch {}
+        topics.set(key, t)
+    }
+    t.publish(new ROSLIB.Message(message))
+}
+
+// helpers
+function publishCmdVel(linear, angular) {
+    publishTopic('/cmd_vel', 'geometry_msgs/Twist', {
         linear: { x: linear, y: 0, z: 0 },
         angular: { x: 0, y: 0, z: angular },
     })
 }
 
-export const publishGoal = (x, y, theta) => {
-    rosClient.publishTopic('/move_base_simple/goal', 'geometry_msgs/PoseStamped', {
+function publishGoalPose(x, y, theta) {
+    publishTopic('/move_base_simple/goal', 'geometry_msgs/PoseStamped', {
         header: {
+            stamp: { sec: Math.floor(Date.now() / 1000), nanosec: 0 },
             frame_id: 'map',
-            stamp: {
-                secs: Math.floor(Date.now() / 1000),
-                nsecs: (Date.now() % 1000) * 1e6,
-            },
         },
         pose: {
             position: { x, y, z: 0 },
-            orientation: {
-                x: 0, y: 0,
-                z: Math.sin(theta / 2),
-                w: Math.cos(theta / 2),
-            },
+            orientation: { x: 0, y: 0, z: Math.sin(theta / 2), w: Math.cos(theta / 2) },
         },
     })
 }
 
-export default rosClient
+function stopRobot() { publishCmdVel(0, 0) }
+function moveForward(speed = 0.2)  { publishCmdVel(speed, 0) }
+function moveBackward(speed = 0.2) { publishCmdVel(-speed, 0) }
+function turnLeft(speed = 0.5)     { publishCmdVel(0, speed) }
+function turnRight(speed = 0.5)    { publishCmdVel(0, -speed) }
+
+const api = {
+    connect,
+    disconnect,
+    destroy,
+    isConnected,
+    getConnectionStatus,
+    onStateChange,
+    addListener,        // Sidebar.jsx için
+    removeListener,     // Sidebar.jsx için
+    subscribeTopic,
+    unsubscribeTopic,
+    publishTopic,
+    publishCmdVel,
+    publishGoalPose,
+    stopRobot,
+    moveForward,
+    moveBackward,
+    turnLeft,
+    turnRight,
+}
+
+export {
+    connect,
+    disconnect,
+    destroy,
+    isConnected,
+    getConnectionStatus,
+    onStateChange,
+    addListener,
+    removeListener,
+    subscribeTopic,
+    unsubscribeTopic,
+    publishTopic,
+    publishCmdVel,
+    publishGoalPose,
+    stopRobot,
+    moveForward,
+    moveBackward,
+    turnLeft,
+    turnRight,
+}
+export const rosClient = api
+export default api

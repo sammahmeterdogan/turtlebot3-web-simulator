@@ -1,246 +1,258 @@
 import React, { useEffect, useRef, useState } from 'react'
-import * as THREE from 'three'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, Grid, PerspectiveCamera, Stats } from '@react-three/drei'
 import { rosClient } from '../../services/rosClient'
 
-// Robot Model Component
-const RobotModel = ({ position, rotation }) => {
-    const meshRef = useRef()
-
-    useFrame(() => {
-        if (meshRef.current) {
-            meshRef.current.position.set(position[0], position[1], position[2])
-            meshRef.current.rotation.set(0, 0, rotation)
-        }
-    })
-
-    return (
-        <group ref={meshRef}>
-            {/* Robot body */}
-            <mesh position={[0, 0, 0.05]}>
-                <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-                <meshStandardMaterial color="#3b82f6" />
-            </mesh>
-
-            {/* Direction indicator */}
-            <mesh position={[0.12, 0, 0.05]}>
-                <coneGeometry args={[0.03, 0.08, 8]} />
-                <meshStandardMaterial color="#ef4444" />
-            </mesh>
-
-            {/* Wheels */}
-            <mesh position={[0.08, 0.12, 0.02]} rotation={[Math.PI / 2, 0, 0]}>
-                <cylinderGeometry args={[0.03, 0.03, 0.02, 16]} />
-                <meshStandardMaterial color="#1f2937" />
-            </mesh>
-            <mesh position={[0.08, -0.12, 0.02]} rotation={[Math.PI / 2, 0, 0]}>
-                <cylinderGeometry args={[0.03, 0.03, 0.02, 16]} />
-                <meshStandardMaterial color="#1f2937" />
-            </mesh>
-            <mesh position={[-0.08, 0.12, 0.02]} rotation={[Math.PI / 2, 0, 0]}>
-                <cylinderGeometry args={[0.03, 0.03, 0.02, 16]} />
-                <meshStandardMaterial color="#1f2937" />
-            </mesh>
-            <mesh position={[-0.08, -0.12, 0.02]} rotation={[Math.PI / 2, 0, 0]}>
-                <cylinderGeometry args={[0.03, 0.03, 0.02, 16]} />
-                <meshStandardMaterial color="#1f2937" />
-            </mesh>
-        </group>
-    )
-}
-
-// Laser Scan Visualization
-const LaserScan = ({ scanData }) => {
-    const pointsRef = useRef()
-
-    useEffect(() => {
-        if (!scanData || !pointsRef.current) return
-
-        const positions = []
-        const colors = []
-
-        scanData.ranges.forEach((range, index) => {
-            if (range > scanData.range_min && range < scanData.range_max) {
-                const angle = scanData.angle_min + index * scanData.angle_increment
-                const x = range * Math.cos(angle)
-                const y = range * Math.sin(angle)
-
-                positions.push(x, y, 0.05)
-
-                // Color based on distance
-                const normalized = range / scanData.range_max
-                colors.push(1 - normalized, normalized, 0)
-            }
-        })
-
-        const geometry = new THREE.BufferGeometry()
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-
-        pointsRef.current.geometry = geometry
-    }, [scanData])
-
-    return (
-        <points ref={pointsRef}>
-            <bufferGeometry />
-            <pointsMaterial size={0.02} vertexColors />
-        </points>
-    )
-}
-
-// Path Visualization
-const PathLine = ({ points }) => {
-    const lineRef = useRef()
-
-    useEffect(() => {
-        if (!points || points.length < 2) return
-
-        const positions = []
-        points.forEach(point => {
-            positions.push(point.x, point.y, 0.02)
-        })
-
-        const geometry = new THREE.BufferGeometry()
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-
-        if (lineRef.current) {
-            lineRef.current.geometry = geometry
-        }
-    }, [points])
-
-    return (
-        <line ref={lineRef}>
-            <bufferGeometry />
-            <lineBasicMaterial color="#10b981" linewidth={2} />
-        </line>
-    )
-}
-
-// Map Grid
-const MapGrid = ({ mapData }) => {
-    const meshRef = useRef()
-
-    useEffect(() => {
-        if (!mapData) return
-
-        const { width, height, data } = mapData
-        const geometry = new THREE.PlaneGeometry(width * 0.05, height * 0.05, width, height)
-
-        const colors = []
-        data.forEach(value => {
-            const color = value === 0 ? 0.9 : value === 100 ? 0.1 : 0.5
-            colors.push(color, color, color)
-        })
-
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-
-        if (meshRef.current) {
-            meshRef.current.geometry = geometry
-        }
-    }, [mapData])
-
-    return (
-        <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-            <planeGeometry args={[10, 10, 100, 100]} />
-            <meshBasicMaterial vertexColors side={THREE.DoubleSide} opacity={0.8} transparent />
-        </mesh>
-    )
-}
-
-// Main Scene Component
-const Scene = () => {
-    const [robotPose, setRobotPose] = useState([0, 0, 0])
-    const [robotRotation, setRobotRotation] = useState(0)
+// Simple 2D Canvas-based visualization (production ready)
+const RvizPanel = () => {
+    const canvasRef = useRef(null)
+    const [robotPose, setRobotPose] = useState({ x: 0, y: 0, theta: 0 })
     const [scanData, setScanData] = useState(null)
     const [pathPoints, setPathPoints] = useState([])
-    const [mapData, setMapData] = useState(null)
+    const [isConnected, setIsConnected] = useState(false)
+
+    // Canvas dimensions and scaling
+    const CANVAS_WIDTH = 800
+    const CANVAS_HEIGHT = 600
+    const SCALE = 100 // pixels per meter
+    const CENTER_X = CANVAS_WIDTH / 2
+    const CENTER_Y = CANVAS_HEIGHT / 2
 
     useEffect(() => {
-        // Subscribe to odometry
-        const odomTopic = rosClient.subscribeTopic('/odom', 'nav_msgs/Odometry', (msg) => {
-            const pose = msg.pose.pose.position
-            const orientation = msg.pose.pose.orientation
+        // Check ROS connection
+        const checkConnection = () => {
+            setIsConnected(rosClient.isConnected())
+        }
 
-            setRobotPose([pose.x, pose.y, pose.z])
+        checkConnection()
+        const connectionInterval = setInterval(checkConnection, 1000)
 
-            // Convert quaternion to euler (yaw only)
-            const yaw = Math.atan2(
-                2 * (orientation.w * orientation.z + orientation.x * orientation.y),
-                1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z)
-            )
-            setRobotRotation(yaw)
+        // Subscribe to odometry if connected
+        let odomTopic = null
+        let scanTopic = null
 
-            // Add to path
-            setPathPoints(prev => [...prev.slice(-100), { x: pose.x, y: pose.y }])
-        })
+        const setupSubscriptions = () => {
+            if (rosClient.isConnected()) {
+                // Subscribe to odometry
+                odomTopic = rosClient.subscribeTopic('/odom', 'nav_msgs/Odometry', (msg) => {
+                    try {
+                        const pose = msg?.pose?.pose?.position || { x: 0, y: 0 }
+                        const orientation = msg?.pose?.pose?.orientation || { x: 0, y: 0, z: 0, w: 1 }
 
-        // Subscribe to laser scan
-        const scanTopic = rosClient.subscribeTopic('/scan', 'sensor_msgs/LaserScan', (msg) => {
-            setScanData(msg)
-        })
+                        // Convert quaternion to yaw
+                        const yaw = Math.atan2(
+                            2 * (orientation.w * orientation.z + orientation.x * orientation.y),
+                            1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z)
+                        )
 
-        // Subscribe to map
-        const mapTopic = rosClient.subscribeTopic('/map', 'nav_msgs/OccupancyGrid', (msg) => {
-            setMapData({
-                width: msg.info.width,
-                height: msg.info.height,
-                resolution: msg.info.resolution,
-                data: msg.data,
-            })
-        })
+                        setRobotPose({ x: pose.x, y: pose.y, theta: yaw })
+
+                        // Add to path (keep last 200 points)
+                        setPathPoints(prev => [...prev.slice(-199), { x: pose.x, y: pose.y }])
+                    } catch (error) {
+                        console.error('Odom parsing error:', error)
+                    }
+                })
+
+                // Subscribe to laser scan
+                scanTopic = rosClient.subscribeTopic('/scan', 'sensor_msgs/LaserScan', (msg) => {
+                    try {
+                        setScanData(msg)
+                    } catch (error) {
+                        console.error('Scan parsing error:', error)
+                    }
+                })
+            }
+        }
+
+        setupSubscriptions()
+
+        // Retry connection setup if not connected
+        const setupInterval = setInterval(() => {
+            if (!odomTopic && rosClient.isConnected()) {
+                setupSubscriptions()
+            }
+        }, 2000)
 
         return () => {
+            clearInterval(connectionInterval)
+            clearInterval(setupInterval)
             if (odomTopic) rosClient.unsubscribeTopic('/odom')
             if (scanTopic) rosClient.unsubscribeTopic('/scan')
-            if (mapTopic) rosClient.unsubscribeTopic('/map')
         }
     }, [])
 
+    // Canvas drawing function
+    useEffect(() => {
+        const canvas = canvasRef.current
+        if (!canvas) return
+
+        const ctx = canvas.getContext('2d')
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+        // Set canvas size
+        canvas.width = CANVAS_WIDTH
+        canvas.height = CANVAS_HEIGHT
+
+        // Draw grid
+        ctx.strokeStyle = '#374151'
+        ctx.lineWidth = 1
+        ctx.setLineDash([2, 2])
+
+        // Vertical grid lines
+        for (let x = 0; x <= CANVAS_WIDTH; x += SCALE / 2) {
+            ctx.beginPath()
+            ctx.moveTo(x, 0)
+            ctx.lineTo(x, CANVAS_HEIGHT)
+            ctx.stroke()
+        }
+
+        // Horizontal grid lines
+        for (let y = 0; y <= CANVAS_HEIGHT; y += SCALE / 2) {
+            ctx.beginPath()
+            ctx.moveTo(0, y)
+            ctx.lineTo(CANVAS_WIDTH, y)
+            ctx.stroke()
+        }
+
+        ctx.setLineDash([])
+
+        // Draw axes
+        ctx.strokeStyle = '#3b82f6'
+        ctx.lineWidth = 2
+
+        // X-axis
+        ctx.beginPath()
+        ctx.moveTo(CENTER_X, CENTER_Y)
+        ctx.lineTo(CENTER_X + SCALE, CENTER_Y)
+        ctx.stroke()
+
+        // Y-axis
+        ctx.beginPath()
+        ctx.moveTo(CENTER_X, CENTER_Y)
+        ctx.lineTo(CENTER_X, CENTER_Y - SCALE)
+        ctx.stroke()
+
+        // Draw axes labels
+        ctx.fillStyle = '#3b82f6'
+        ctx.font = '12px monospace'
+        ctx.fillText('X', CENTER_X + SCALE + 5, CENTER_Y + 5)
+        ctx.fillText('Y', CENTER_X - 10, CENTER_Y - SCALE - 5)
+
+        // Draw origin
+        ctx.fillStyle = '#ef4444'
+        ctx.beginPath()
+        ctx.arc(CENTER_X, CENTER_Y, 3, 0, 2 * Math.PI)
+        ctx.fill()
+
+        // Draw path
+        if (pathPoints.length > 1) {
+            ctx.strokeStyle = '#10b981'
+            ctx.lineWidth = 2
+            ctx.beginPath()
+
+            pathPoints.forEach((point, index) => {
+                const x = CENTER_X + point.x * SCALE
+                const y = CENTER_Y - point.y * SCALE // Flip Y coordinate
+
+                if (index === 0) {
+                    ctx.moveTo(x, y)
+                } else {
+                    ctx.lineTo(x, y)
+                }
+            })
+            ctx.stroke()
+        }
+
+        // Draw laser scan
+        if (scanData && scanData.ranges) {
+            ctx.fillStyle = '#f59e0b'
+            scanData.ranges.forEach((range, index) => {
+                if (range > scanData.range_min && range < scanData.range_max) {
+                    const angle = scanData.angle_min + index * scanData.angle_increment
+                    const globalAngle = robotPose.theta + angle
+                    const x = CENTER_X + (robotPose.x + range * Math.cos(globalAngle)) * SCALE
+                    const y = CENTER_Y - (robotPose.y + range * Math.sin(globalAngle)) * SCALE
+
+                    ctx.beginPath()
+                    ctx.arc(x, y, 1, 0, 2 * Math.PI)
+                    ctx.fill()
+                }
+            })
+        }
+
+        // Draw robot
+        const robotX = CENTER_X + robotPose.x * SCALE
+        const robotY = CENTER_Y - robotPose.y * SCALE
+
+        // Robot body
+        ctx.fillStyle = '#3b82f6'
+        ctx.beginPath()
+        ctx.arc(robotX, robotY, 15, 0, 2 * Math.PI)
+        ctx.fill()
+
+        // Robot direction indicator
+        ctx.strokeStyle = '#ef4444'
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.moveTo(robotX, robotY)
+        ctx.lineTo(
+            robotX + 20 * Math.cos(robotPose.theta),
+            robotY - 20 * Math.sin(robotPose.theta)
+        )
+        ctx.stroke()
+
+        // Draw robot coordinates
+        ctx.fillStyle = '#ffffff'
+        ctx.font = '11px monospace'
+        ctx.fillText(
+            `(${robotPose.x.toFixed(2)}, ${robotPose.y.toFixed(2)})`,
+            robotX + 25,
+            robotY - 10
+        )
+
+    }, [robotPose, scanData, pathPoints])
+
     return (
-        <>
-            <PerspectiveCamera makeDefault position={[2, 2, 2]} fov={60} />
-            <OrbitControls enablePan enableZoom enableRotate />
+        <div className="w-full h-full bg-gray-950 flex items-center justify-center relative">
+            {!isConnected && (
+                <div className="absolute inset-0 bg-gray-900/80 flex items-center justify-center z-10">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                        <p className="text-white text-sm">Connecting to ROS...</p>
+                        <p className="text-gray-400 text-xs mt-1">Make sure ROS bridge is running</p>
+                    </div>
+                </div>
+            )}
 
-            {/* Lighting */}
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
-
-            {/* Grid */}
-            <Grid
-                infiniteGrid
-                fadeDistance={30}
-                cellSize={0.5}
-                sectionSize={2}
-                sectionColor="#3b82f6"
-                cellColor="#374151"
+            <canvas
+                ref={canvasRef}
+                className="border border-gray-700 rounded-lg max-w-full max-h-full"
+                style={{
+                    imageRendering: 'pixelated',
+                    background: 'linear-gradient(135deg, #111827 0%, #1f2937 100%)'
+                }}
             />
 
-            {/* Robot */}
-            <RobotModel position={robotPose} rotation={robotRotation} />
+            {/* Info panel */}
+            <div className="absolute top-4 left-4 bg-gray-900/90 backdrop-blur-sm rounded-lg p-3 text-xs text-white">
+                <div className="space-y-1">
+                    <div>Status: {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
+                    <div>Position: ({robotPose.x.toFixed(2)}, {robotPose.y.toFixed(2)})</div>
+                    <div>Heading: {(robotPose.theta * 180 / Math.PI).toFixed(1)}°</div>
+                    <div>Path Points: {pathPoints.length}</div>
+                    <div>Scan Points: {scanData?.ranges?.length || 0}</div>
+                </div>
+            </div>
 
-            {/* Laser scan */}
-            {scanData && <LaserScan scanData={scanData} />}
-
-            {/* Path */}
-            {pathPoints.length > 1 && <PathLine points={pathPoints} />}
-
-            {/* Map */}
-            {mapData && <MapGrid mapData={mapData} />}
-
-            {/* Coordinate axes */}
-            <axesHelper args={[1]} />
-        </>
-    )
-}
-
-const RvizPanel = () => {
-    return (
-        <div className="w-full h-full bg-gray-950">
-            <Canvas shadows>
-                <Scene />
-                <Stats className="stats-panel" />
-            </Canvas>
+            {/* Controls info */}
+            <div className="absolute bottom-4 left-4 bg-gray-900/90 backdrop-blur-sm rounded-lg p-3 text-xs text-gray-300">
+                <div className="space-y-1">
+                    <div className="text-white font-medium mb-2">Visualization:</div>
+                    <div>🔵 Robot Position</div>
+                    <div>🔴 Robot Orientation</div>
+                    <div>🟢 Path Trail</div>
+                    <div>🟡 Laser Scan</div>
+                </div>
+            </div>
         </div>
     )
 }

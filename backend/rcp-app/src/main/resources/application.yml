@@ -3,9 +3,9 @@ spring:
     name: rcp-app
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/turtlebot_sim}
-    username: ${DB_USERNAME:turtlebot}
-    password: ${DB_PASSWORD:turtlebot123}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/turtlebot3_db}
+    username: ${DB_USERNAME:samma} # (not: buradaki açıklama satırı '#' ile olmalı)
+    password: ${DB_PASSWORD:1234} # (not: buradaki açıklama satırı '#' ile olmalı)
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -25,13 +25,14 @@ server:
   port: ${SERVER_PORT:8080}
 
 ros:
-  docker:  # (not: buradaki açıklama satırı '#' ile olmalı)
+  docker:
     host: ${DOCKER_HOST:unix:///var/run/docker.sock}
-    compose-file: ${COMPOSE_FILE:./ros-stack/docker-compose.yml}
+    compose-file: ${COMPOSE_FILE:/home/samma/Desktop/turtlebot3-web-simulator/ros-stack/docker-compose.yml}
     network: ${DOCKER_NETWORK:turtlebot-network}
   bridge:
     url: ${ROSBRIDGE_URL:ws://localhost:9090}
     reconnect-interval: 5000
+
   video:
     stream-url: ${VIDEO_STREAM_URL:http://localhost:8080}
   simulation:

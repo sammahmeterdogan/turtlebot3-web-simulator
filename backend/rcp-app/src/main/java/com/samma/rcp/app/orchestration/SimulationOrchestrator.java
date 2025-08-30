@@ -1,83 +1,58 @@
 package com.samma.rcp.app.orchestration;
 
-import com.samma.rcp.app.config.RosDockerProps;
-import com.samma.rcp.app.domain.entity.SimulationSession;
-import com.samma.rcp.app.domain.model.RobotModel;
-import com.samma.rcp.app.domain.model.ScenarioType;
-import com.samma.rcp.app.domain.model.SimulationStatus;
-import com.samma.rcp.app.domain.repo.SimulationSessionRepository;
-import com.samma.rcp.app.ws.RobotSocketHandler;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 
-@Slf4j
+/**
+ * Docker Compose’i kaldırır/indirir. Port bekler.
+ *
+ * Özelleştirilebilirlik:
+ *  - Compose dosyası yolu:
+ *      * JVM: -Dros.compose.file=ros-stack/docker-compose.yml
+ *      * ENV: ROS_COMPOSE_FILE=ros-stack/docker-compose.yml
+ *    (Varsayılan: ros-stack/docker-compose.yml)
+ *  - WebSocket portu:
+ *      * JVM: -Dros.ws.port=9090
+ *      * ENV: ROS_WS_PORT=9090
+ *    (Varsayılan: 9090)
+ */
 @Component
-@RequiredArgsConstructor
 public class SimulationOrchestrator {
-
-    private final RosDockerProps props;
     private final DockerService docker;
-    private final RosBridgeClient ros;
-    private final SimulationSessionRepository sessions;
-    private final RobotSocketHandler.WebSocketController ws;
 
-    public SimulationSession start(RobotModel model, ScenarioType scenario) {
-        String compose = props.getDocker().getComposeFile();
+    private final Path compose = Paths.get(
+            System.getProperty("ros.compose.file",
+                    System.getenv().getOrDefault("ROS_COMPOSE_FILE", "ros-stack/docker-compose.yml"))
+    ).toAbsolutePath();
 
-        SimulationSession s = sessions.save(SimulationSession.builder()
-                .model(model)
-                .scenario(scenario)
-                .status(SimulationStatus.STARTING)
-                .rosBridgeUrl(props.getBridge().getUrl())
-                .videoUrl(props.getVideo().getStreamUrl())
-                .startedAt(LocalDateTime.now())
-                .build());
-        ws.broadcastStatus(s);
+    private final int wsPort = Integer.parseInt(
+            System.getProperty("ros.ws.port",
+                    System.getenv().getOrDefault("ROS_WS_PORT", "9090"))
+    );
 
-        Map<String, String> env = new HashMap<>(System.getenv());
-        env.put("TURTLEBOT3_MODEL", model.toEnvValue());
-        env.put("SCENARIO_KEY", scenario.name());
-        env.put("ROSBRIDGE_PORT", "9090");
-
-        docker.composeUp(compose, env);
-
-        boolean ok = docker.waitForPort("localhost", 9090, Duration.ofMillis(props.getSimulation().getStartupTimeout()));
-        if (!ok) {
-            s.setStatus(SimulationStatus.ERROR);
-            s.setErrorMessage("rosbridge not ready");
-            sessions.save(s);
-            ws.broadcastStatus(s);
-            throw new IllegalStateException("rosbridge not ready");
-        }
-
-        ros.connect(props.getBridge().getUrl());
-        s.setStatus(SimulationStatus.RUNNING);
-        sessions.save(s);
-        ws.broadcastStatus(s);
-        return s;
+    public SimulationOrchestrator(DockerService docker) {
+        this.docker = docker;
     }
 
-    public SimulationSession stop() {
-        docker.composeDown(props.getDocker().getComposeFile(), System.getenv());
-        ros.disconnect();
-        SimulationSession running = sessions.findTopByStatusOrderByStartedAtDesc(SimulationStatus.RUNNING).orElse(null);
-        if (running != null) {
-            running.setStatus(SimulationStatus.STOPPED);
-            running.setEndedAt(LocalDateTime.now());
-            sessions.save(running);
-            ws.broadcastStatus(running);
-        }
-        return running;
+    public void start() {
+        docker.composeUp(compose);
+        // Konteyner ayağa kalkana kadar WS portunu bekle
+        boolean ok = docker.waitForPort("localhost", wsPort, Duration.ofSeconds(25));
+        if (!ok) throw new IllegalStateException("ROSBridge " + wsPort + " açılmadı");
     }
 
-    public SimulationSession current() {
-        return sessions.findTopByStatusOrderByStartedAtDesc(SimulationStatus.RUNNING)
-                .orElseGet(() -> sessions.findTopByStatusOrderByStartedAtDesc(SimulationStatus.STARTING).orElse(null));
+    public void stop() {
+        docker.composeDown(compose);
+    }
+
+    public boolean isRunning() {
+        return docker.waitForPort("localhost", wsPort, Duration.ofSeconds(1));
+    }
+
+    public int getWsPort() {
+        return wsPort;
     }
 }

@@ -12,9 +12,10 @@ import {
     Keyboard
 } from 'lucide-react'
 import { teleopAPI } from '../../services/api'
-import { publishCmdVel } from '../../services/rosClient'
+import { rosClient } from '../../services/rosClient'
 
-const TeleopPad = ({ enabled = true }) => {
+const TeleopPad = ({ enabled = true, disabled = false, onMove }) => {
+    const isEnabled = enabled && !disabled
     const [mode, setMode] = useState('keyboard') // 'keyboard' or 'joystick'
     const [velocity, setVelocity] = useState({ linear: 0, angular: 0 })
     const [isPressed, setIsPressed] = useState({})
@@ -25,7 +26,7 @@ const TeleopPad = ({ enabled = true }) => {
 
     // Send velocity command
     const sendVelocity = (linear, angular) => {
-        if (!enabled) return
+        if (!isEnabled) return
 
         const cmd = {
             linear: { x: linear, y: 0, z: 0 },
@@ -33,10 +34,19 @@ const TeleopPad = ({ enabled = true }) => {
         }
 
         // Use ROS client for direct publishing
-        publishCmdVel(linear, angular)
+        try {
+            rosClient.publishTopic('/cmd_vel', 'geometry_msgs/Twist', cmd)
+        } catch (error) {
+            console.error('Failed to publish cmd_vel:', error)
+        }
 
         // Also send via REST API for backend tracking
         teleopAPI.sendTwist(cmd).catch(console.error)
+
+        // Call onMove callback if provided
+        if (onMove) {
+            onMove({ linear, angular })
+        }
 
         setVelocity({ linear, angular })
     }
@@ -59,7 +69,7 @@ const TeleopPad = ({ enabled = true }) => {
 
     // Keyboard event handlers
     useEffect(() => {
-        if (!enabled || mode !== 'keyboard') return
+        if (!isEnabled || mode !== 'keyboard') return
 
         const handleKeyDown = (e) => {
             if (e.repeat) return
@@ -97,6 +107,7 @@ const TeleopPad = ({ enabled = true }) => {
                     moveBackwardRight()
                     break
                 case ' ':
+                    e.preventDefault()
                     stopRobot()
                     break
             }
@@ -107,7 +118,7 @@ const TeleopPad = ({ enabled = true }) => {
             setIsPressed(prev => ({ ...prev, [key]: false }))
 
             // Stop robot when key is released
-            if (['w', 's', 'a', 'd', 'q', 'e', 'z', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+            if (['w', 's', 'a', 'd', 'q', 'e', 'z', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) {
                 stopRobot()
             }
         }
@@ -119,11 +130,22 @@ const TeleopPad = ({ enabled = true }) => {
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [enabled, mode])
+    }, [isEnabled, mode])
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current)
+                intervalRef.current = null
+            }
+            stopRobot()
+        }
+    }, [])
 
     // Button press handlers
     const handleButtonPress = (action) => {
-        if (!enabled) return
+        if (!isEnabled) return
 
         action()
 
@@ -147,7 +169,7 @@ const TeleopPad = ({ enabled = true }) => {
                     onClick={() => setMode('keyboard')}
                     className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                         mode === 'keyboard'
-                            ? 'bg-primary-600 text-white'
+                            ? 'bg-blue-600 text-white'
                             : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                     }`}
                 >
@@ -158,7 +180,7 @@ const TeleopPad = ({ enabled = true }) => {
                     onClick={() => setMode('joystick')}
                     className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                         mode === 'joystick'
-                            ? 'bg-primary-600 text-white'
+                            ? 'bg-blue-600 text-white'
                             : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                     }`}
                 >
@@ -166,6 +188,13 @@ const TeleopPad = ({ enabled = true }) => {
                     <span className="text-sm">Joystick</span>
                 </button>
             </div>
+
+            {/* Enable/Disable Status */}
+            {!isEnabled && (
+                <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3 text-center">
+                    <p className="text-yellow-400 text-sm">Control is disabled - Start simulation first</p>
+                </div>
+            )}
 
             {/* Control Pad */}
             <div className="bg-gray-800 rounded-lg p-4">
@@ -178,8 +207,8 @@ const TeleopPad = ({ enabled = true }) => {
                         onMouseLeave={handleButtonRelease}
                         onTouchStart={() => handleButtonPress(moveForwardLeft)}
                         onTouchEnd={handleButtonRelease}
-                        disabled={!enabled}
-                        className="p-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-900 rounded-lg transition-colors"
+                        disabled={!isEnabled}
+                        className="p-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-900 disabled:opacity-50 rounded-lg transition-colors"
                     >
                         <div className="rotate-[-45deg]">
                             <ArrowUp className="w-5 h-5 text-white" />
@@ -194,8 +223,8 @@ const TeleopPad = ({ enabled = true }) => {
                         onMouseLeave={handleButtonRelease}
                         onTouchStart={() => handleButtonPress(moveForward)}
                         onTouchEnd={handleButtonRelease}
-                        disabled={!enabled}
-                        className={`p-3 ${isPressed.w || isPressed.arrowup ? 'bg-primary-600' : 'bg-gray-700 hover:bg-gray-600'} disabled:bg-gray-900 rounded-lg transition-colors`}
+                        disabled={!isEnabled}
+                        className={`p-3 ${isPressed.w || isPressed.arrowup ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} disabled:bg-gray-900 disabled:opacity-50 rounded-lg transition-colors`}
                     >
                         <ArrowUp className="w-5 h-5 text-white" />
                     </motion.button>
@@ -208,8 +237,8 @@ const TeleopPad = ({ enabled = true }) => {
                         onMouseLeave={handleButtonRelease}
                         onTouchStart={() => handleButtonPress(moveForwardRight)}
                         onTouchEnd={handleButtonRelease}
-                        disabled={!enabled}
-                        className="p-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-900 rounded-lg transition-colors"
+                        disabled={!isEnabled}
+                        className="p-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-900 disabled:opacity-50 rounded-lg transition-colors"
                     >
                         <div className="rotate-45">
                             <ArrowUp className="w-5 h-5 text-white" />
@@ -224,8 +253,8 @@ const TeleopPad = ({ enabled = true }) => {
                         onMouseLeave={handleButtonRelease}
                         onTouchStart={() => handleButtonPress(turnLeft)}
                         onTouchEnd={handleButtonRelease}
-                        disabled={!enabled}
-                        className={`p-3 ${isPressed.a || isPressed.arrowleft ? 'bg-primary-600' : 'bg-gray-700 hover:bg-gray-600'} disabled:bg-gray-900 rounded-lg transition-colors`}
+                        disabled={!isEnabled}
+                        className={`p-3 ${isPressed.a || isPressed.arrowleft ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} disabled:bg-gray-900 disabled:opacity-50 rounded-lg transition-colors`}
                     >
                         <RotateCcw className="w-5 h-5 text-white" />
                     </motion.button>
@@ -234,8 +263,8 @@ const TeleopPad = ({ enabled = true }) => {
                     <motion.button
                         whileTap={{ scale: 0.95 }}
                         onClick={stopRobot}
-                        disabled={!enabled}
-                        className="p-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-900 rounded-lg transition-colors"
+                        disabled={!isEnabled}
+                        className="p-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-900 disabled:opacity-50 rounded-lg transition-colors"
                     >
                         <Square className="w-5 h-5 text-white" />
                     </motion.button>
@@ -248,8 +277,8 @@ const TeleopPad = ({ enabled = true }) => {
                         onMouseLeave={handleButtonRelease}
                         onTouchStart={() => handleButtonPress(turnRight)}
                         onTouchEnd={handleButtonRelease}
-                        disabled={!enabled}
-                        className={`p-3 ${isPressed.d || isPressed.arrowright ? 'bg-primary-600' : 'bg-gray-700 hover:bg-gray-600'} disabled:bg-gray-900 rounded-lg transition-colors`}
+                        disabled={!isEnabled}
+                        className={`p-3 ${isPressed.d || isPressed.arrowright ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} disabled:bg-gray-900 disabled:opacity-50 rounded-lg transition-colors`}
                     >
                         <RotateCw className="w-5 h-5 text-white" />
                     </motion.button>
@@ -262,8 +291,8 @@ const TeleopPad = ({ enabled = true }) => {
                         onMouseLeave={handleButtonRelease}
                         onTouchStart={() => handleButtonPress(moveBackwardLeft)}
                         onTouchEnd={handleButtonRelease}
-                        disabled={!enabled}
-                        className="p-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-900 rounded-lg transition-colors"
+                        disabled={!isEnabled}
+                        className="p-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-900 disabled:opacity-50 rounded-lg transition-colors"
                     >
                         <div className="rotate-[-135deg]">
                             <ArrowUp className="w-5 h-5 text-white" />
@@ -278,8 +307,8 @@ const TeleopPad = ({ enabled = true }) => {
                         onMouseLeave={handleButtonRelease}
                         onTouchStart={() => handleButtonPress(moveBackward)}
                         onTouchEnd={handleButtonRelease}
-                        disabled={!enabled}
-                        className={`p-3 ${isPressed.s || isPressed.arrowdown ? 'bg-primary-600' : 'bg-gray-700 hover:bg-gray-600'} disabled:bg-gray-900 rounded-lg transition-colors`}
+                        disabled={!isEnabled}
+                        className={`p-3 ${isPressed.s || isPressed.arrowdown ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'} disabled:bg-gray-900 disabled:opacity-50 rounded-lg transition-colors`}
                     >
                         <ArrowDown className="w-5 h-5 text-white" />
                     </motion.button>
@@ -292,8 +321,8 @@ const TeleopPad = ({ enabled = true }) => {
                         onMouseLeave={handleButtonRelease}
                         onTouchStart={() => handleButtonPress(moveBackwardRight)}
                         onTouchEnd={handleButtonRelease}
-                        disabled={!enabled}
-                        className="p-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-900 rounded-lg transition-colors"
+                        disabled={!isEnabled}
+                        className="p-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-900 disabled:opacity-50 rounded-lg transition-colors"
                     >
                         <div className="rotate-[135deg]">
                             <ArrowUp className="w-5 h-5 text-white" />
@@ -348,6 +377,11 @@ const TeleopPad = ({ enabled = true }) => {
                     </div>
                 </div>
             )}
+
+            {/* Connection Status */}
+            <div className="text-xs text-center text-gray-500">
+                {isEnabled ? '✓ Control Active' : '⚠ Control Disabled'}
+            </div>
         </div>
     )
 }

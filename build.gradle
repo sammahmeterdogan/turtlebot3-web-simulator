@@ -6,33 +6,32 @@ plugins {
 allprojects {
     group = 'com.samma.rcp'
     version = '1.0.0'
-    
-    repositories {
-        mavenCentral()
-    }
+    // DİKKAT: repositories BLOĞU BURADA OLMAYACAK!
+    // Repositories, settings.gradle içindeki dependencyResolutionManagement'tan geliyor.
 }
 
 subprojects {
     apply plugin: 'java'
     apply plugin: 'io.spring.dependency-management'
-    
+
     dependencyManagement {
         imports {
+            // Spring BOM: alt projelerde starter versiyonlarını sabitler
             mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
         }
     }
-    
+
     java {
         sourceCompatibility = '17'
         targetCompatibility = '17'
     }
-    
+
     configurations {
         compileOnly {
             extendsFrom annotationProcessor
         }
     }
-    
+
     tasks.named('test') {
         useJUnitPlatform()
     }

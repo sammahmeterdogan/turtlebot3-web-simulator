@@ -335,3 +335,220 @@ example_scenario (
     difficulty VARCHAR(50),
     enabled BOOLEAN
 )
+## 🚀 Hızlı Kurulum (Clone Eden Kişiler İçin)
+
+### Ön Gereksinimler
+
+#### 1. Node.js 18+ Kurulumu (Ubuntu/Linux)
+```bash
+# Node.js versiyonunu kontrol edin
+node --version  # 18+ olmalı
+
+# Eğer eski versiyon varsa:
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Alternatif: nvm kullanın
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+source ~/.bashrc
+nvm install 18
+nvm use 18
+```
+
+#### 2. Java 17+ Kurulumu
+```bash
+# Java versiyonunu kontrol edin
+java --version  # 17+ olmalı
+
+# Ubuntu'da Java 17 kurulumu
+sudo apt update
+sudo apt install openjdk-17-jdk
+
+# JAVA_HOME ayarlayın
+echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
+source ~/.bashrc
+```
+
+#### 3. Docker Kurulumu (Opsiyonel)
+```bash
+# Docker kurulumu
+sudo apt update
+sudo apt install docker.io docker-compose
+sudo usermod -aG docker $USER
+# Yeniden giriş yapın veya newgrp docker çalıştırın
+```
+
+### Projeyi Clone Etme ve Başlatma
+
+#### Tek Komutla Kurulum
+```bash
+# Projeyi clone et
+git clone <repository-url>
+cd turtlebot3-web-simulator
+
+# Frontend kurulumu ve başlatma
+cd frontend
+npm install
+npm run dev
+```
+
+#### Backend Kurulumu (Development Mode)
+```bash
+# Başka bir terminal açın
+cd backend
+
+# H2 veritabanı ile development mode (PostgreSQL kurulum gerektirmez)
+./gradlew bootRun --args='--spring.profiles.active=dev'
+```
+
+#### Production Mode (Docker ile)
+```bash
+# Root dizinde
+docker-compose up --build
+```
+
+### Erişim URL'leri
+
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8080/api
+- **Swagger UI**: http://localhost:8080/swagger-ui.html
+- **H2 Database Console** (dev mode): http://localhost:8080/h2-console
+
+### ROS Bridge Bağlantısı
+
+ROS Bridge WebSocket sunucusu otomatik olarak Docker ile başlatılır. Manuel başlatmak için:
+
+```bash
+# ROS Noetic ile
+roslaunch rosbridge_server rosbridge_websocket.launch
+
+# Docker ile
+docker run -p 9090:9090 local/rosbridge:humble
+```
+
+## 🔧 Sorun Giderme
+
+### Sık Karşılaşılan Sorunlar
+
+#### 1. Node.js Versiyon Hatası
+```bash
+# Hata: "Unexpected token '.'"
+# Çözüm: Node.js 18+ güncelleyin
+```
+
+#### 2. Frontend Bağlantı Sorunu
+```bash
+# Hata: "WebSocket connection failed"
+# Çözüm: Backend'in çalıştığından emin olun
+curl http://localhost:8080/api/sim/status
+```
+
+#### 3. ROS Bridge Bağlantı Sorunu
+```bash
+# Hata: "ROS Bridge disconnected"
+# Çözüm: ROS Bridge servisini kontrol edin
+docker ps | grep rosbridge
+```
+
+#### 4. Database Bağlantı Sorunu
+```bash
+# Development mode kullanın (H2 in-memory database)
+./gradlew bootRun --args='--spring.profiles.active=dev'
+```
+
+### Log Kontrolü
+
+#### Frontend Logs
+```bash
+# Browser console (F12)
+# Veya terminal'de:
+cd frontend && npm run dev
+```
+
+#### Backend Logs
+```bash
+# Terminal'de:
+cd backend && ./gradlew bootRun
+
+# Docker ile:
+docker logs turtlebot3-backend
+```
+
+### Port Kullanımı
+
+| Servis | Port | Açıklama |
+|--------|------|----------|
+| Frontend | 5173 | Development server |
+| Backend | 8080 | Spring Boot API |
+| ROS Bridge | 9090 | WebSocket server |
+| PostgreSQL | 5432 | Database |
+| Frontend (Prod) | 3000 | Docker production |
+
+### Development vs Production
+
+#### Development Mode (Önerilen)
+```bash
+# Terminal 1: Backend (H2 database)
+cd backend && ./gradlew bootRun --args='--spring.profiles.active=dev'
+
+# Terminal 2: Frontend
+cd frontend && npm run dev
+
+# Terminal 3: ROS Bridge (opsiyonel)
+docker run -p 9090:9090 local/rosbridge:humble
+```
+
+#### Production Mode
+```bash
+# Tek komut - tüm sistemi başlatır
+docker-compose up --build
+```
+
+### İlk Çalıştırma Kontrol Listesi
+
+- [ ] Node.js 18+ kurulu
+- [ ] Java 17+ kurulu
+- [ ] Frontend dependencies yüklendi (`npm install`)
+- [ ] Backend başarıyla compile oldu (`./gradlew build`)
+- [ ] Frontend erişilebilir (http://localhost:5173)
+- [ ] Backend API yanıtlıyor (http://localhost:8080/api/sim/status)
+- [ ] ROS Bridge bağlantısı kuruldu
+- [ ] Dashboard sayfası yükleniyor
+- [ ] Simulator sayfası 3D görselleştirme gösteriyor
+
+### Hızlı Test
+
+```bash
+# 1. Backend test
+curl http://localhost:8080/api/sim/status
+
+# 2. Frontend test
+# Browser'da http://localhost:5173 açın
+# Dashboard sayfasından Simulator'a gidin
+# "Start Simulation" butonuna tıklayın
+
+# 3. WebSocket test
+# Browser console'da ROS Bridge bağlantısını kontrol edin
+```
+
+## 🤝 Geliştirici Notları
+
+### Kod Değişiklikleri Sonrası
+
+```bash
+# Frontend hot reload otomatik
+# Backend için restart gerekli:
+cd backend && ./gradlew bootRun
+```
+
+### Debug Mode
+
+```bash
+# Backend debug mode
+./gradlew bootRun --debug-jvm
+
+# Frontend debug
+npm run dev -- --debug
+```
+
+Bu adımları takip ederek proje 5 dakikada çalışır hale gelecektir.

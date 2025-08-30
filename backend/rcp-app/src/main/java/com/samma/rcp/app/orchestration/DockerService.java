@@ -1,58 +1,60 @@
 package com.samma.rcp.app.orchestration;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
 
-@Slf4j
-@Service
-@RequiredArgsConstructor
+/**
+ * Sadeçe sistemde kurulu docker/compose CLI'larını çağırır.
+ * CI/CD ve farklı kullanıcılar için path bağımsızdır; compose "-f <dosya>" ile veriliyor.
+ */
+@Component
 public class DockerService {
+    private static final Logger log = LoggerFactory.getLogger(DockerService.class);
 
-    public void composeUp(String composeFile, Map<String, String> env) {
-        run(List.of("docker", "compose", "-f", composeFile, "up", "-d"), env);
+    /** docker compose up -d */
+    public void composeUp(Path composeFile) {
+        run("docker","compose","-f", composeFile.toString(), "up", "-d");
     }
 
-    public void composeDown(String composeFile, Map<String, String> env) {
-        run(List.of("docker", "compose", "-f", composeFile, "down"), env);
+    /** docker compose down */
+    public void composeDown(Path composeFile) {
+        run("docker","compose","-f", composeFile.toString(), "down");
     }
 
+    /** Belirtilen host:port dinlemeye geçti mi? */
     public boolean waitForPort(String host, int port, Duration timeout) {
-        long end = System.currentTimeMillis() + timeout.toMillis();
-        while (System.currentTimeMillis() < end) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
             try (Socket s = new Socket()) {
-                s.connect(new InetSocketAddress(host, port), 1500);
+                s.connect(new InetSocketAddress(host, port), 1000);
                 return true;
-            } catch (Exception ignored) {
-                try { Thread.sleep(500); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            } catch (IOException ignored) {
+                try { Thread.sleep(300); } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt(); return false;
+                }
             }
         }
         return false;
     }
 
-    private void run(List<String> cmd, Map<String, String> env) {
+    private void run(String... cmd) {
         try {
-            log.info("Running: {}", String.join(" ", cmd));
-            ProcessBuilder pb = new ProcessBuilder(cmd);
-            if (env != null) pb.environment().putAll(env);
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-                String line;
-                while ((line = r.readLine()) != null) log.info("[compose] {}", line);
-            }
+            Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+            String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             int code = p.waitFor();
+            log.info("[compose] {}", out.trim()); // Log: UI istemez; opsiyonel saklanır
             if (code != 0) throw new IllegalStateException("Process exit: " + code);
-        } catch (Exception e) {
-            throw new RuntimeException("Docker compose failed", e);
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
         }
     }
 }

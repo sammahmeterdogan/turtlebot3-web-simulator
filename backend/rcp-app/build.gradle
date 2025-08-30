@@ -1,31 +1,68 @@
 plugins {
-    id 'org.springframework.boot'
-    id 'io.spring.dependency-management'
+    id "org.springframework.boot"
+    id "io.spring.dependency-management"
+    id "java"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
 
 dependencies {
-    implementation project(':backend:rcp-base')
+    implementation project(":backend:rcp-base")
 
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-websocket'
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // Spring Boot Starters
+    implementation "org.springframework.boot:spring-boot-starter-web"
+    implementation "org.springframework.boot:spring-boot-starter-data-jpa"
+    implementation "org.springframework.boot:spring-boot-starter-websocket"
+    implementation "org.springframework.boot:spring-boot-starter-security"
+    implementation "org.springframework.boot:spring-boot-starter-validation"
+    implementation "org.springframework.boot:spring-boot-starter-actuator"
 
-    implementation 'org.flywaydb:flyway-core'
-    runtimeOnly 'org.postgresql:postgresql'
+    // Database
+    runtimeOnly "org.postgresql:postgresql"
+    runtimeOnly "com.h2database:h2" // Development database
 
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
+    // Migration
+    implementation "org.flywaydb:flyway-core"
 
-    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
-    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
+    // Code generation
+    compileOnly "org.projectlombok:lombok"
+    annotationProcessor "org.projectlombok:lombok"
+    implementation "org.mapstruct:mapstruct:1.5.5.Final"
+    annotationProcessor "org.mapstruct:mapstruct-processor:1.5.5.Final"
 
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
-    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    // Documentation
+    implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0"
 
-    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
-    
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // JSON Processing
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310"
+
+    // WebSocket
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    implementation "org.springframework:spring-messaging"
+
+    // Test
+    testImplementation "org.springframework.boot:spring-boot-starter-test"
+    testImplementation "org.testcontainers:junit-jupiter"
+    testImplementation "org.testcontainers:postgresql"
+}
+
+// Bootable JAR configuration
+jar {
+    enabled = false
+}
+
+bootJar {
+    archiveFileName = "turtlebot3-backend.jar"
+}
+
+// Test configuration
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
 }

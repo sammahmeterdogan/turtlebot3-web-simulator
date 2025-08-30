@@ -1,1 +1,23 @@
-# Docker Compose configuration for ROS stack
+# Her makinada çalışsın diye relatif context (.) kullanıyoruz.
+services:
+  rosbridge:
+    build:
+      context: .
+      dockerfile: rosbridge.Dockerfile
+    container_name: rosbridge
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=42         # Aynı ağda birden çok sim için domain değiştirilebilir
+    ports:
+      - "9090:9090"              # DIŞ PORT:SOL (host)  İÇ PORT:SAĞ (container)
+      # Başka port istiyorsanız sol tarafı değiştirin (örn: "9091:9090")
+
+  talker:
+    build:
+      context: .
+      dockerfile: talker.Dockerfile
+    container_name: talker
+    network_mode: "service:rosbridge"  # Aynı network namespace — localhost ile konuşurlar
+    restart: unless-stopped
+    depends_on:
+      - rosbridge

@@ -1,114 +1,110 @@
+// frontend/src/services/ws.js
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
-class WebSocketService {
-  constructor() {
-    this.client = null
-    this.connected = false
-    this.subscriptions = new Map()
-    this.reconnectAttempts = 0
-    this.maxReconnectAttempts = 10
-    this.reconnectDelay = 2000
-  }
-
-  connect(url = 'http://localhost:8080/ws/robot') {
-    return new Promise((resolve, reject) => {
-      this.client = new Client({
-        webSocketFactory: () => new SockJS(url),
-        debug: (str) => {
-          if (import.meta.env.DEV) {
-            console.log('STOMP:', str)
-          }
-        },
-        reconnectDelay: this.reconnectDelay,
-        heartbeatIncoming: 4000,
-        heartbeatOutgoing: 4000,
-        onConnect: () => {
-          console.log('WebSocket connected')
-          this.connected = true
-          this.reconnectAttempts = 0
-          resolve()
-        },
-        onStompError: (frame) => {
-          console.error('STOMP error:', frame.headers['message'])
-          reject(new Error(frame.headers['message']))
-        },
-        onWebSocketClose: () => {
-          console.log('WebSocket connection closed')
-          this.connected = false
-          this.attemptReconnect()
-        },
-      })
-
-      this.client.activate()
-    })
-  }
-
-  disconnect() {
-    if (this.client && this.connected) {
-      this.subscriptions.forEach((subscription) => {
-        subscription.unsubscribe()
-      })
-      this.subscriptions.clear()
-      this.client.deactivate()
-      this.connected = false
-    }
-  }
-
-  subscribe(topic, callback) {
-    if (!this.client || !this.connected) {
-      console.error('WebSocket not connected')
-      return null
-    }
-
-    const subscription = this.client.subscribe(topic, (message) => {
-      try {
-        const data = JSON.parse(message.body)
-        callback(data)
-      } catch (error) {
-        console.error('Error parsing message:', error)
-        callback(message.body)
-      }
-    })
-
-    this.subscriptions.set(topic, subscription)
-    return subscription
-  }
-
-  unsubscribe(topic) {
-    const subscription = this.subscriptions.get(topic)
-    if (subscription) {
-      subscription.unsubscribe()
-      this.subscriptions.delete(topic)
-    }
-  }
-
-  send(destination, body) {
-    if (!this.client || !this.connected) {
-      console.error('WebSocket not connected')
-      return
-    }
-
-    this.client.publish({
-      destination,
-      body: typeof body === 'string' ? body : JSON.stringify(body),
-    })
-  }
-
-  attemptReconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++
-      console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
-      setTimeout(() => {
-        this.connect().catch(console.error)
-      }, this.reconnectDelay * this.reconnectAttempts)
-    }
-  }
-
-  isConnected() {
-    return this.connected
-  }
+function resolveHttpUrl(input) {
+    if (!input) return `${window.location.origin}/ws/robot`
+    if (input.startsWith('/')) return `${window.location.origin}${input}`
+    return input
 }
 
+class WebSocketService {
+    constructor() {
+        this.client = null
+        this.connected = false
+        this.subscriptions = new Map()
+        this.reconnectAttempts = 0
+        this.maxReconnectAttempts = 5
+        this.reconnectDelay = 2000
+        this.isDestroyed = false
+        this.defaultUrl = (import.meta.env && import.meta.env.VITE_WS_URL) || '/ws/robot'
+    }
+
+    connect(url = this.defaultUrl) {
+        if (this.isDestroyed) return Promise.reject(new Error('Service destroyed'))
+
+        const httpUrl = resolveHttpUrl(url)
+        return new Promise((resolve, reject) => {
+            try {
+                this.client = new Client({
+                    webSocketFactory: () => new SockJS(httpUrl),
+                    debug: (str) => { if (import.meta.env?.DEV) console.log('STOMP:', str) },
+                    reconnectDelay: this.reconnectDelay,
+                    heartbeatIncoming: 4000,
+                    heartbeatOutgoing: 4000,
+                    onConnect: () => {
+                        this.connected = true
+                        this.reconnectAttempts = 0
+                        resolve()
+                    },
+                    onStompError: (frame) => {
+                        const msg = frame.headers?.message || 'STOMP error'
+                        reject(new Error(msg))
+                    },
+                    onWebSocketClose: () => {
+                        this.connected = false
+                        if (this.isDestroyed) return
+                        if (this.reconnectAttempts >= this.maxReconnectAttempts) return
+                        this.reconnectAttempts += 1
+                        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1)
+                        setTimeout(() => { if (!this.isDestroyed) this.attemptReconnect() }, delay)
+                    },
+                })
+                this.client.activate()
+            } catch (err) {
+                reject(err)
+            }
+        })
+    }
+
+    attemptReconnect() {
+        if (this.isDestroyed || this.connected) return
+        this.client?.activate()
+    }
+
+    disconnect() {
+        try { this.client?.deactivate() } catch {}
+        this.connected = false
+    }
+
+    destroy() {
+        this.isDestroyed = true
+        this.disconnect()
+        this.subscriptions.clear()
+        this.client = null
+    }
+
+    subscribe(destination, callback) {
+        if (!this.connected || !this.client) {
+            console.warn('WebSocket not connected')
+            return null
+        }
+        const sub = this.client.subscribe(destination, callback)
+        this.subscriptions.set(destination, sub)
+        return sub
+    }
+
+    unsubscribe(destination) {
+        const sub = this.subscriptions.get(destination)
+        if (sub) {
+            try { sub.unsubscribe() } catch {}
+            this.subscriptions.delete(destination)
+        }
+    }
+
+    send(destination, body = {}) {
+        if (!this.connected || !this.client) {
+            console.warn('WebSocket not connected')
+            return
+        }
+        this.client.publish({ destination, body: JSON.stringify(body) })
+    }
+
+    // EKSİK OLAN METOT: Dashboard.jsx 'wsService.isConnected()' çağırıyor
+    isConnected() {
+        return !!this.connected
+    }
+}
+
+export default WebSocketService
 export const wsService = new WebSocketService()
-export default wsService
