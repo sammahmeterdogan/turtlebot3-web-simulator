@@ -1,8 +1,4 @@
-
-<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/460a9cb9-f487-4668-abb7-a9e5ac10ae5f" />
-<img width="2068" height="1259" alt="image" src="https://github.com/user-attachments/assets/6c0bb126-fff0-4f68-a123-72a518f4e5a7" />
-<img width="2059" height="1029" alt="image" src="https://github.com/user-attachments/assets/c44db6cd-8281-44a6-ae0d-b083b0167500" />
- 🤖 TurtleBot3 Web Simülatörü
+# 🤖 TurtleBot3 Web Simülatörü
 
 **Terminal kullanmadan, tamamen web üzerinden TurtleBot3 robot simülasyonu ve kontrolü platformu**
 
@@ -11,7 +7,6 @@
 - [Proje Hakkında](#-proje-hakkında)
 - [Özellikler](#-özellikler)
 - [Sistem Mimarisi](#-sistem-mimarisi)
-- [Gereksinimler](#-gereksinimler)
 - [Kurulum](#-kurulum)
 - [Kullanım](#-kullanım)
 - [API Dokümantasyonu](#-api-dokümantasyonu)
@@ -235,6 +230,527 @@ frontend/
 └── package.json                # Bağımlılıklar ve scriptler
 ```
 
+## 🚀 Kurulum
+
+### Adım 1: Sistem Gereksinimlerinin Kontrol Edilmesi ve Kurulumu
+
+#### 1.1 Node.js 18+ Kurulumu (Ubuntu/Linux)
+```bash
+# Mevcut Node.js versiyonunu kontrol edin
+node --version  # 18+ olması gerekli
+
+# Eğer Node.js yüklü değilse veya eski versiyon varsa:
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Alternatif: nvm ile kurulum (önerilen)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+source ~/.bashrc
+nvm install 18
+nvm use 18
+nvm alias default 18
+```
+
+#### 1.2 Java 17+ Kurulumu
+```bash
+# Mevcut Java versiyonunu kontrol edin
+java --version  # 17+ olması gerekli
+
+# Ubuntu'da Java 17 kurulumu
+sudo apt update
+sudo apt install openjdk-17-jdk
+
+# JAVA_HOME ortam değişkenini ayarlayın
+echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
+source ~/.bashrc
+
+# Java kurulumunu doğrulayın
+java --version
+javac --version
+```
+
+#### 1.3 Docker ve Docker Compose Kurulumu
+```bash
+# Docker kurulumu
+sudo apt update
+sudo apt install docker.io docker-compose-plugin
+
+# Docker servisini başlatın
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Kullanıcıyı docker grubuna ekleyin (root olmadan çalıştırmak için)
+sudo usermod -aG docker $USER
+
+# Yeniden giriş yapın veya aşağıdaki komutu çalıştırın
+newgrp docker
+
+# Docker kurulumunu doğrulayın
+docker --version
+docker compose version
+```
+
+#### 1.4 Git Kurulumu (eğer yoksa)
+```bash
+# Git kurulumu
+sudo apt install git
+
+# Git konfigürasyonu
+git config --global user.name "İsminiz"
+git config --global user.email "email@example.com"
+```
+
+### Adım 2: Projeyi Clone Etme
+
+```bash
+# Projeyi bilgisayarınıza indirin
+git clone <repository-url>
+cd turtlebot3-web-simulator
+
+# Proje yapısını kontrol edin
+ls -la
+# Şu klasörler görünmelidir: frontend/, backend/, ros-stack/
+```
+
+### Adım 3: PostgreSQL Kurulumu (Opsiyonel - Production için)
+
+#### 3.1 PostgreSQL Kurulumu
+```bash
+# PostgreSQL kurulumu
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# PostgreSQL servisini başlatın
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+```
+
+#### 3.2 Veritabanı Oluşturma
+```bash
+# PostgreSQL kullanıcısına geçin
+sudo -u postgres psql
+
+# Veritabanı ve kullanıcı oluşturun
+CREATE DATABASE turtlebot3_db;
+CREATE USER turtlebot3_user WITH PASSWORD 'password123';
+GRANT ALL PRIVILEGES ON DATABASE turtlebot3_db TO turtlebot3_user;
+\q
+```
+
+### Adım 4: Backend Kurulumu ve Çalıştırma
+
+#### 4.1 Development Mode (Önerilen - H2 Database)
+```bash
+# Backend dizinine gidin
+cd backend
+
+# Gradle wrapper'ın çalıştırılabilir olduğundan emin olun
+chmod +x gradlew
+
+# Projeyi build edin (ilk kez çalıştırma uzun sürebilir)
+./gradlew build
+
+# Development modunda başlatın (H2 in-memory database kullanır)
+./gradlew bootRun --args='--spring.profiles.active=dev'
+```
+
+#### 4.2 Production Mode (PostgreSQL ile)
+```bash
+# PostgreSQL ile production modunda başlatma
+./gradlew bootRun --args='--spring.profiles.active=prod'
+```
+
+#### 4.3 Backend Çalışma Kontrolü
+```bash
+# Başka bir terminalde API'yi test edin
+curl http://localhost:8080/api/sim/status
+
+# Swagger UI'ya erişim
+# Tarayıcıda: http://localhost:8080/swagger-ui.html
+```
+
+### Adım 5: Frontend Kurulumu ve Çalıştırma
+
+```bash
+# Yeni bir terminal açın
+cd turtlebot3-web-simulator/frontend
+
+# Node modüllerini yükleyin
+npm install
+
+# Development sunucusunu başlatın
+npm run dev
+
+# Alternatif olarak:
+npm start
+```
+
+#### 5.1 Frontend Çalışma Kontrolü
+```bash
+# Tarayıcıda aşağıdaki URL'yi açın:
+# http://localhost:5173
+
+# Terminal çıktısında şu mesajları görmelisiniz:
+# "Local:   http://localhost:5173/"
+# "Network: http://192.168.x.x:5173/"
+```
+
+### Adım 6: ROS Stack (Docker ile TurtleBot3 Simülasyonu)
+
+> ℹ️ **Not — Docker ile Tek Komutta Çalıştırma**
+> 
+> Bu Compose altyapısı **TurtleBot3 simülasyonu (Gazebo)**, **SLAM (slam_toolbox)**, **Nav2 (navigasyon)** ve **rosbridge (WebSocket köprüsü)** servislerini tek seferde ayağa kaldırır. Gerçek robota ihtiyaç duymadan web tabanlı geliştirme ve test yapabilirsiniz.
+
+#### 6.1 ROS Stack Başlatma
+```bash
+# Ana proje dizinine gidin
+cd turtlebot3-web-simulator
+
+# ROS stack'i başlatın (tüm ROS servisleri)
+docker compose -f ros-stack/docker-compose.yml up -d --build
+
+# Servislerin durumunu kontrol edin
+docker compose -f ros-stack/docker-compose.yml ps
+
+# Logları takip edin
+docker compose -f ros-stack/docker-compose.yml logs -f
+```
+
+#### 6.2 ROS Services Kontrolü
+```bash
+# ROS Bridge bağlantısını test edin
+# Tarayıcıda: ws://localhost:9090
+
+# Gazebo simülasyon penceresinin açıldığını kontrol edin
+# Docker logs ile Gazebo'nun başladığını doğrulayın:
+docker compose -f ros-stack/docker-compose.yml logs gazebo
+```
+
+### Adım 7: Sistem Entegrasyonu Testi
+
+#### 7.1 Servis Portları Kontrolü
+```bash
+# Tüm servislerin çalıştığını kontrol edin
+netstat -tulpn | grep -E ":(3000|8080|5173|9090|5432)"
+
+# Veya:
+ss -tulpn | grep -E ":(3000|8080|5173|9090|5432)"
+```
+
+| Servis | Port | URL | Durum |
+|--------|------|-----|--------|
+| Frontend (Dev) | 5173 | http://localhost:5173 | ✅ |
+| Backend API | 8080 | http://localhost:8080/api | ✅ |
+| ROS Bridge | 9090 | ws://localhost:9090 | ✅ |
+| PostgreSQL | 5432 | localhost:5432 | ✅ (opsiyonel) |
+| Swagger UI | 8080 | http://localhost:8080/swagger-ui.html | ✅ |
+
+#### 7.2 Entegre Test
+```bash
+# 1. Frontend erişim testi
+curl -s http://localhost:5173 > /dev/null && echo "Frontend: OK" || echo "Frontend: FAIL"
+
+# 2. Backend API testi
+curl -s http://localhost:8080/api/sim/status && echo "Backend: OK" || echo "Backend: FAIL"
+
+# 3. ROS Bridge testi (basit WebSocket kontrolü)
+nc -zv localhost 9090 && echo "ROS Bridge: OK" || echo "ROS Bridge: FAIL"
+```
+
+### Adım 8: İlk Simülasyon Testi
+
+#### 8.1 Web Arayüzü Üzerinden Test
+```bash
+# 1. Tarayıcıda http://localhost:5173 adresini açın
+# 2. Dashboard sayfasında sistem durumlarını kontrol edin
+# 3. "Simulator" menüsüne gidin
+# 4. Robot modelini seçin (Burger önerilir)
+# 5. "Start Simulation" butonuna tıklayın
+# 6. 3D görselleştirmede robotun göründüğünü doğrulayın
+# 7. Teleoperation pad ile robotun hareket ettiğini test edin
+```
+
+#### 8.2 Terminal Üzerinden Durum Kontrolü
+```bash
+# Backend loglarını izleyin
+cd backend && ./gradlew bootRun --info
+
+# ROS Bridge loglarını izleyin
+docker compose -f ros-stack/docker-compose.yml logs -f rosbridge
+
+# Gazebo simülasyon loglarını izleyin
+docker compose -f ros-stack/docker-compose.yml logs -f gazebo
+```
+
+## 🚀 Alternatif Kurulum Yöntemleri
+
+### Yöntem 1: Full Docker (Tüm Stack)
+```bash
+# Tüm sistemi Docker ile çalıştırma
+docker compose up --build -d
+
+# Erişim URL'leri:
+# Frontend: http://localhost:3000
+# Backend: http://localhost:8080
+# ROS Bridge: ws://localhost:9090
+```
+
+### Yöntem 2: Development Mode (Önerilen)
+```bash
+# Terminal 1: Backend (H2 database ile)
+cd backend && ./gradlew bootRun --args='--spring.profiles.active=dev'
+
+# Terminal 2: Frontend (hot reload ile)
+cd frontend && npm run dev
+
+# Terminal 3: ROS Stack (sadece ROS servisleri)
+docker compose -f ros-stack/docker-compose.yml up -d
+```
+
+### Yöntem 3: Production Mode
+```bash
+# PostgreSQL kurulumu gerekli (Adım 3)
+# Frontend build
+cd frontend && npm run build
+
+# Backend production mode
+cd backend && ./gradlew bootRun --args='--spring.profiles.active=prod'
+
+# ROS Stack
+docker compose -f ros-stack/docker-compose.yml up -d
+```
+
+## 🔧 Kurulum Sonrası Yapılacaklar
+
+### İlk Konfigürasyon
+1. **Robot Model Ayarı**: Dashboard'da varsayılan robot modelini seçin
+2. **Harita Klasörü**: Haritaların kaydedileceği klasörü belirleyin
+3. **ROS Bridge URL**: Varsayılan ws://localhost:9090 ayarını doğrulayın
+
+### Geliştirme Ortamı Hazırlığı
+```bash
+# IDE'ler için önerilen eklentiler:
+# - VS Code: Spring Boot Extension Pack, ES7+ React snippets
+# - IntelliJ IDEA: Spring Boot, JavaScript/TypeScript
+```
+
+## 🔧 Sorun Giderme
+
+### Sık Karşılaşılan Sorunlar
+
+#### 1. Node.js Versiyon Hatası
+```bash
+# Hata: "Unexpected token '.'" veya ES6 syntax hataları
+# Çözüm: Node.js versiyonunu 18+ güncelleyin
+node --version  # 18.x.x veya üstü olmalı
+```
+
+#### 2. Java Versiyon Hatası
+```bash
+# Hata: "Unsupported class file major version" 
+# Çözüm: Java 17+ yükleyin ve JAVA_HOME'u ayarlayın
+java --version  # 17.x.x veya üstü olmalı
+echo $JAVA_HOME  # Boş olmamalı
+```
+
+#### 3. Frontend Bağlantı Sorunu
+```bash
+# Hata: "WebSocket connection failed" veya API çağrıları başarısız
+# Çözüm: Backend'in çalıştığından emin olun
+curl -v http://localhost:8080/health
+# Beklenilen: 200 OK yanıtı
+```
+
+#### 4. ROS Bridge Bağlantı Sorunu
+```bash
+# Hata: "ROS Bridge disconnected" veya WebSocket hatası
+# Çözüm: ROS stack konteynerlerini kontrol edin
+docker compose -f ros-stack/docker-compose.yml ps
+# Beklenilen: Tüm servisler "running" durumunda
+```
+
+#### 5. Database Bağlantı Sorunu
+```bash
+# Hata: "Connection to database failed"
+# Çözüm 1: Development mode kullanın (H2 database)
+./gradlew bootRun --args='--spring.profiles.active=dev'
+
+# Çözüm 2: PostgreSQL servisini kontrol edin
+sudo systemctl status postgresql
+sudo -u postgres psql -c "\l"  # Veritabanı listesi
+```
+
+#### 6. Port Kullanım Çakışması
+```bash
+# Hata: "Port already in use" veya "EADDRINUSE"
+# Çözüm: Kullanılan portları kontrol edin
+sudo netstat -tulpn | grep -E ":(3000|8080|5173|9090|5432)"
+
+# Çakışan süreci sonlandırın
+sudo lsof -ti:8080 | xargs kill -9  # 8080 portu için örnek
+```
+
+### Log Kontrolü ve Debugging
+
+#### Backend Logs
+```bash
+# Development modunda detaylı loglar
+./gradlew bootRun --args='--spring.profiles.active=dev --logging.level.com.samma.rcp=DEBUG'
+
+# Production modunda loglar
+./gradlew bootRun --info
+
+# Docker ile backend çalışıyorsa
+docker logs turtlebot3-backend -f
+```
+
+#### Frontend Logs
+```bash
+# Terminal logs
+cd frontend && npm run dev
+
+# Browser console (F12)
+# Network tab'ında API çağrılarını kontrol edin
+# Console tab'ında JavaScript hatalarını kontrol edin
+```
+
+#### ROS Stack Logs
+```bash
+# Tüm ROS servislerin logları
+docker compose -f ros-stack/docker-compose.yml logs -f
+
+# Belirli bir servisin logları
+docker compose -f ros-stack/docker-compose.yml logs -f rosbridge
+docker compose -f ros-stack/docker-compose.yml logs -f gazebo
+docker compose -f ros-stack/docker-compose.yml logs -f navigation
+```
+
+### Performans Optimizasyonu
+
+#### Memory ve CPU Kullanımı
+```bash
+# Docker konteyner kaynak kullanımı
+docker stats
+
+# Java heap boyutu ayarı (eğer memory sorunu varsa)
+./gradlew bootRun --args='--spring.profiles.active=dev -Xmx2g -Xms1g'
+```
+
+#### Gazebo Performansı
+```bash
+# GPU acceleration için (NVIDIA kartı varsa)
+docker compose -f ros-stack/docker-compose.yml --profile gpu up
+```
+
+### Sistem Sağlık Kontrolü
+
+#### Otomatik Health Check Script
+```bash
+#!/bin/bash
+# health_check.sh dosyası oluşturun
+
+echo "=== TurtleBot3 Web Simulator Health Check ==="
+
+# Frontend check
+if curl -s http://localhost:5173 > /dev/null; then
+    echo "✅ Frontend: OK"
+else
+    echo "❌ Frontend: FAIL"
+fi
+
+# Backend check
+if curl -s http://localhost:8080/api/sim/status > /dev/null; then
+    echo "✅ Backend: OK"
+else
+    echo "❌ Backend: FAIL"
+fi
+
+# ROS Bridge check
+if nc -zv localhost 9090 2>/dev/null; then
+    echo "✅ ROS Bridge: OK"
+else
+    echo "❌ ROS Bridge: FAIL"
+fi
+
+# Docker containers check
+echo "=== Docker Container Status ==="
+docker compose -f ros-stack/docker-compose.yml ps
+```
+
+#### Scriptı Çalıştırma
+```bash
+chmod +x health_check.sh
+./health_check.sh
+```
+
+### Recovery Procedures
+
+#### Tam Sistem Restart
+```bash
+# 1. Tüm servisleri durdur
+pkill -f "java.*spring-boot"  # Backend
+pkill -f "vite"              # Frontend
+docker compose -f ros-stack/docker-compose.yml down
+
+# 2. Docker volumes temizle (dikkat: veri kaybı olabilir)
+docker system prune -f
+docker volume prune -f
+
+# 3. Yeniden başlat
+./gradlew bootRun --args='--spring.profiles.active=dev' &
+npm run dev &
+docker compose -f ros-stack/docker-compose.yml up -d
+```
+
+#### Veritabanı Reset (H2 Development)
+```bash
+# H2 database dosyalarını sil
+rm -rf backend/data/
+./gradlew bootRun --args='--spring.profiles.active=dev'
+```
+
+## 📚 Geliştirici Kılavuzu
+
+### Hot Reload ve Development
+```bash
+# Frontend: Otomatik hot reload aktif
+cd frontend && npm run dev
+
+# Backend: Code değişikliklerinde restart gerekli
+# IntelliJ IDEA kullanıyorsanız: Spring Boot DevTools aktif
+# VS Code kullanıyorsanız: Manuel restart gerekli
+```
+
+### Testing
+```bash
+# Backend testleri
+cd backend && ./gradlew test
+
+# Frontend testleri  
+cd frontend && npm test
+
+# Integration testleri
+cd backend && ./gradlew integrationTest
+```
+
+### Build ve Deployment
+```bash
+# Frontend production build
+cd frontend && npm run build
+
+# Backend production jar
+cd backend && ./gradlew bootJar
+
+# Docker images
+docker compose -f docker-compose.prod.yml build
+```
+
+Bu adımları takip ederek TurtleBot3 Web Simülatörü sistemi 10-15 dakikada tam olarak kurulup çalışır hale gelecektir. Herhangi bir sorun yaşarsanız, yukarıdaki sorun giderme bölümünü kontrol edin.
+
+---
+
+## API Dokümantasyonu
+
 ### API Endpoint'leri
 
 #### Simülasyon Yönetimi
@@ -337,220 +853,28 @@ example_scenario (
     difficulty VARCHAR(50),
     enabled BOOLEAN
 )
-## 🚀 Hızlı Kurulum (Clone Eden Kişiler İçin)
-
-### Ön Gereksinimler
-
-#### 1. Node.js 18+ Kurulumu (Ubuntu/Linux)
-```bash
-# Node.js versiyonunu kontrol edin
-node --version  # 18+ olmalı
-
-# Eğer eski versiyon varsa:
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Alternatif: nvm kullanın
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-source ~/.bashrc
-nvm install 18
-nvm use 18
 ```
 
-#### 2. Java 17+ Kurulumu
-```bash
-# Java versiyonunu kontrol edin
-java --version  # 17+ olmalı
+## 🚀 Kullanım
 
-# Ubuntu'da Java 17 kurulumu
-sudo apt update
-sudo apt install openjdk-17-jdk
+### İlk Başlatma
+1. **Frontend**: http://localhost:5173
+2. **Dashboard** sayfasında sistem durumunu kontrol edin
+3. **Simulator** menüsüne gidin
+4. Robot modelini seçin (Burger önerilir)
+5. "Start Simulation" butonuna tıklayın
 
-# JAVA_HOME ayarlayın
-echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
-source ~/.bashrc
-```
+### Robot Kontrolü
+- **Klavye**: W,A,S,D tuşları ile hareket
+- **Joystick**: Sanal joystick ile kontrol
+- **Navigasyon**: Harita üzerinde hedef belirleme
 
-#### 3. Docker Kurulumu (Opsiyonel)
-```bash
-# Docker kurulumu
-sudo apt update
-sudo apt install docker.io docker-compose
-sudo usermod -aG docker $USER
-# Yeniden giriş yapın veya newgrp docker çalıştırın
-```
+### Harita Oluşturma
+1. SLAM modunu başlatın
+2. Robotu manuel olarak hareket ettirin
+3. Harita oluşturulmasını bekleyin
+4. "Save Map" ile haritayı kaydedin
 
-### Projeyi Clone Etme ve Başlatma
+---
 
-#### Tek Komutla Kurulum
-```bash
-# Projeyi clone et
-git clone <repository-url>
-cd turtlebot3-web-simulator
-
-# Frontend kurulumu ve başlatma
-cd frontend
-npm install
-npm run dev
-```
-
-#### Backend Kurulumu (Development Mode)
-```bash
-# Başka bir terminal açın
-cd backend
-
-# H2 veritabanı ile development mode (PostgreSQL kurulum gerektirmez)
-./gradlew bootRun --args='--spring.profiles.active=dev'
-```
-
-#### Production Mode (Docker ile)
-```bash
-# Root dizinde
-docker-compose up --build
-```
-
-### Erişim URL'leri
-
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8080/api
-- **Swagger UI**: http://localhost:8080/swagger-ui.html
-- **H2 Database Console** (dev mode): http://localhost:8080/h2-console
-
-### ROS Bridge Bağlantısı
-
-ROS Bridge WebSocket sunucusu otomatik olarak Docker ile başlatılır. Manuel başlatmak için:
-
-```bash
-# ROS Noetic ile
-roslaunch rosbridge_server rosbridge_websocket.launch
-
-# Docker ile
-docker run -p 9090:9090 local/rosbridge:humble
-```
-
-## 🔧 Sorun Giderme
-
-### Sık Karşılaşılan Sorunlar
-
-#### 1. Node.js Versiyon Hatası
-```bash
-# Hata: "Unexpected token '.'"
-# Çözüm: Node.js 18+ güncelleyin
-```
-
-#### 2. Frontend Bağlantı Sorunu
-```bash
-# Hata: "WebSocket connection failed"
-# Çözüm: Backend'in çalıştığından emin olun
-curl http://localhost:8080/api/sim/status
-```
-
-#### 3. ROS Bridge Bağlantı Sorunu
-```bash
-# Hata: "ROS Bridge disconnected"
-# Çözüm: ROS Bridge servisini kontrol edin
-docker ps | grep rosbridge
-```
-
-#### 4. Database Bağlantı Sorunu
-```bash
-# Development mode kullanın (H2 in-memory database)
-./gradlew bootRun --args='--spring.profiles.active=dev'
-```
-
-### Log Kontrolü
-
-#### Frontend Logs
-```bash
-# Browser console (F12)
-# Veya terminal'de:
-cd frontend && npm run dev
-```
-
-#### Backend Logs
-```bash
-# Terminal'de:
-cd backend && ./gradlew bootRun
-
-# Docker ile:
-docker logs turtlebot3-backend
-```
-
-### Port Kullanımı
-
-| Servis | Port | Açıklama |
-|--------|------|----------|
-| Frontend | 5173 | Development server |
-| Backend | 8080 | Spring Boot API |
-| ROS Bridge | 9090 | WebSocket server |
-| PostgreSQL | 5432 | Database |
-| Frontend (Prod) | 3000 | Docker production |
-
-### Development vs Production
-
-#### Development Mode (Önerilen)
-```bash
-# Terminal 1: Backend (H2 database)
-cd backend && ./gradlew bootRun --args='--spring.profiles.active=dev'
-
-# Terminal 2: Frontend
-cd frontend && npm run dev
-
-# Terminal 3: ROS Bridge (opsiyonel)
-docker run -p 9090:9090 local/rosbridge:humble
-```
-
-#### Production Mode
-```bash
-# Tek komut - tüm sistemi başlatır
-docker-compose up --build
-```
-
-### İlk Çalıştırma Kontrol Listesi
-
-- [ ] Node.js 18+ kurulu
-- [ ] Java 17+ kurulu
-- [ ] Frontend dependencies yüklendi (`npm install`)
-- [ ] Backend başarıyla compile oldu (`./gradlew build`)
-- [ ] Frontend erişilebilir (http://localhost:5173)
-- [ ] Backend API yanıtlıyor (http://localhost:8080/api/sim/status)
-- [ ] ROS Bridge bağlantısı kuruldu
-- [ ] Dashboard sayfası yükleniyor
-- [ ] Simulator sayfası 3D görselleştirme gösteriyor
-
-### Hızlı Test
-
-```bash
-# 1. Backend test
-curl http://localhost:8080/api/sim/status
-
-# 2. Frontend test
-# Browser'da http://localhost:5173 açın
-# Dashboard sayfasından Simulator'a gidin
-# "Start Simulation" butonuna tıklayın
-
-# 3. WebSocket test
-# Browser console'da ROS Bridge bağlantısını kontrol edin
-```
-
-## 🤝 Geliştirici Notları
-
-### Kod Değişiklikleri Sonrası
-
-```bash
-# Frontend hot reload otomatik
-# Backend için restart gerekli:
-cd backend && ./gradlew bootRun
-```
-
-### Debug Mode
-
-```bash
-# Backend debug mode
-./gradlew bootRun --debug-jvm
-
-# Frontend debug
-npm run dev -- --debug
-```
-
-Bu adımları takip ederek proje 5 dakikada çalışır hale gelecektir.
+Bu README, projeyi clone eden herhangi birinin sistemi kolayca kurabilmesi için adım adım detaylı talimatlar içermektedir.
