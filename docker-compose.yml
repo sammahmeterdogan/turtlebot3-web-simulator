@@ -7,9 +7,9 @@ services:
     container_name: turtlebot3-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: turtlebot3_db
-      POSTGRES_USER: samma
-      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: turtlebot3_db # proje kontrol edildikten sonra kontrol edilmeli #
+      POSTGRES_USER: samma # proje kontrol edildikten sonra kontrol edilmeli #
+      POSTGRES_PASSWORD: 1234 # proje kontrol edildikten sonra kontrol edilmeli #
     ports:
       - "5432:5432"
     volumes:
