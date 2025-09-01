@@ -1,4 +1,4 @@
-# Her makinada çalışsın diye relatif context (.) kullanıyoruz.
+# ros-stack/docker-compose.yml  (FINAL - dosyanın KENDİ klasörü baz alınır)
 services:
   rosbridge:
     build:
@@ -7,17 +7,49 @@ services:
     container_name: rosbridge
     restart: unless-stopped
     environment:
-      - ROS_DOMAIN_ID=42         # Aynı ağda birden çok sim için domain değiştirilebilir
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-42}
+      - ROS_BRIDGE_PORT=${ROS_BRIDGE_PORT:-9090}
     ports:
-      - "9090:9090"              # DIŞ PORT:SOL (host)  İÇ PORT:SAĞ (container)
-      # Başka port istiyorsanız sol tarafı değiştirin (örn: "9091:9090")
+      - "${ROS_BRIDGE_PORT:-9090}:9090"
+    networks: [rosnet]
 
-  talker:
+  tb3-sim:
     build:
       context: .
-      dockerfile: talker.Dockerfile
-    container_name: talker
-    network_mode: "service:rosbridge"  # Aynı network namespace — localhost ile konuşurlar
+      dockerfile: tb3-sim.Dockerfile
+    container_name: tb3-sim
     restart: unless-stopped
-    depends_on:
-      - rosbridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-42}
+      - TURTLEBOT3_MODEL=${TURTLEBOT3_MODEL:-burger}
+      - GAZEBO_WORLD=${GAZEBO_WORLD:-turtlebot3_world}
+    depends_on: [rosbridge]
+    volumes:
+      - ./maps:/maps
+    networks: [rosnet]
+
+  tb3-slam:
+    build:
+      context: .
+      dockerfile: tb3-slam.Dockerfile
+    container_name: tb3-slam
+    restart: unless-stopped
+    depends_on: [rosbridge, tb3-sim]
+    networks: [rosnet]
+
+  tb3-nav:
+    build:
+      context: .
+      dockerfile: tb3-nav.Dockerfile
+    container_name: tb3-nav
+    restart: unless-stopped
+    environment:
+      - MAP_FILE=${MAP_FILE:-/maps/map.yaml}
+    depends_on: [rosbridge, tb3-sim, tb3-slam]
+    volumes:
+      - ./maps:/maps
+    networks: [rosnet]
+
+networks:
+  rosnet:
+    driver: bridge
