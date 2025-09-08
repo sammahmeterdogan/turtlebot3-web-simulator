@@ -50,6 +50,22 @@ services:
       - ./maps:/maps
     networks: [rosnet]
 
+  rviz:
+    build:
+      context: .
+      dockerfile: rviz.Dockerfile
+    container_name: rviz-novnc
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-42}
+      - DISPLAY=:0
+      - GEOMETRY=1600x900x24
+      - LIBGL_ALWAYS_SOFTWARE=1
+    depends_on: [rosbridge]
+    ports:
+      - "6080:6080"         # noVNC (HTTP)
+    networks: [rosnet]
+
 networks:
   rosnet:
     driver: bridge
