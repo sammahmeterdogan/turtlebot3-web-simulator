@@ -27,3 +27,28 @@ export const saveMap = (name) => apiClient.post('/map/save', { name });
 
 // --- Examples ---
 export const getExamples = () => apiClient.get('/examples');
+
+// --- Teleop ---
+export const teleopAPI = {
+    sendTwist: (data) => {
+        // Convert geometry_msgs/Twist format to backend TwistDTO format
+        const twist = {
+            linear: data.linear?.x || data.linear || 0,
+            angular: data.angular?.z || data.angular || 0,
+            topic: '/cmd_vel'
+        }
+        return apiClient.post('/teleop/twist', twist)
+    }
+}
+
+// --- Simulation ---
+export const simulationAPI = {
+    status: () => apiClient.get('/sim/status'),
+    start: (data) => apiClient.post('/sim/start', data),
+    stop: () => apiClient.post('/sim/stop')
+}
+
+// --- Visualization ---
+export const visualizationAPI = {
+    getRvizUrl: () => apiClient.get('/visualization/rviz')
+}

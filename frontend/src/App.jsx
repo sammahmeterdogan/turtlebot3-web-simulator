@@ -11,6 +11,7 @@ const Simulator = lazy(() => import('./pages/Simulator'))
 const Examples  = lazy(() => import('./pages/Examples'))
 const Maps      = lazy(() => import('./pages/Maps'))
 const Settings  = lazy(() => import('./pages/Settings'))
+const KeyboardTeleopDemo = lazy(() => import('./pages/KeyboardTeleopDemo'))
 const NotFound  = lazy(() => import('./pages/NotFound'))
 
 const PageLoader = () => (
@@ -32,6 +33,7 @@ export default function App() {
                             <Route path="examples"  element={<Examples />} />
                             <Route path="maps"      element={<Maps />} />
                             <Route path="settings"  element={<Settings />} />
+                            <Route path="demo/keyboard-control" element={<KeyboardTeleopDemo />} />
                             <Route path="*"         element={<NotFound />} />
                         </Route>
                     </Routes>

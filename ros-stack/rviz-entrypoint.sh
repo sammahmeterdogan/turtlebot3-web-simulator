@@ -58,7 +58,7 @@ source /opt/ros/humble/setup.bash
 
 # ROS domain ID'yi ayarla
 export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-42}
-export RMW_IMPLEMENTATION=rmw_cyclonedx_cpp
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 echo "[entrypoint] ROS ortamı hazır"
 echo "  ROS_DOMAIN_ID: $ROS_DOMAIN_ID"

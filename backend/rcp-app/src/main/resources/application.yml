@@ -35,6 +35,8 @@ ros:
 
   video:
     stream-url: ${VIDEO_STREAM_URL:http://localhost:8080}
+  visualization:
+    rviz-url: ${RVIZ_NOVNC_URL:http://localhost:6080/vnc.html?autoconnect=true&resize=remote}
   simulation:
     default-model: ${DEFAULT_MODEL:burger}
     startup-timeout: 30000

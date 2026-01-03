@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Code, Tags, Play, Cpu } from 'lucide-react';
+import { Code, Tags, Play, Cpu, Keyboard, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageContainer from '../components/layout/PageContainer';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -30,6 +30,33 @@ const Examples = () => {
 
     return (
         <PageContainer title="Code Examples" description="Explore and run various pre-built scenarios.">
+            {/* Keyboard Teleop Demo Card */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-2 border-blue-700 rounded-xl overflow-hidden hover:border-blue-600 transition-all cursor-pointer"
+                onClick={() => navigate('/demo/keyboard-control')}
+            >
+                <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                        <div className="p-3 bg-blue-500/20 rounded-lg">
+                            <Keyboard className="w-8 h-8 text-blue-400" />
+                        </div>
+                        <span className="px-3 py-1 text-xs rounded-full border border-green-800 bg-green-900/50 text-green-400">
+                            DEMO
+                        </span>
+                    </div>
+                    <h3 className="text-white font-semibold text-lg mb-2">Keyboard Teleoperation Demo</h3>
+                    <p className="text-gray-300 text-sm mb-4">
+                        Turtlesim-style keyboard control demo. Control the robot using W/A/S/D keys and see it move in real-time.
+                    </p>
+                    <div className="flex items-center gap-2 text-blue-400 text-sm font-medium">
+                        <span>Try Demo</span>
+                        <ChevronRight className="w-4 h-4" />
+                    </div>
+                </div>
+            </motion.div>
+
             {isLoading ? (
                 <div className="flex items-center justify-center h-64">
                     <LoadingSpinner size="large" />
