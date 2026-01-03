@@ -1,107 +1,61 @@
-import React from 'react'
-import { motion } from 'framer-motion'
-import { Bell, Search, User, Power, Info, GitBranch } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
-import { simulationAPI } from '../../services/api'
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Bell, Wifi, GitBranch } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { getStatus } from '../../services/api'; // Düzeltilmiş import
 
 const Topbar = () => {
+    // API sorgusu 'getStatus' kullanacak şekilde güncellendi.
     const { data: status } = useQuery({
-        queryKey: ['simulation-status'],
-        queryFn: simulationAPI.status,
+        queryKey: ['simulationStatus'],
+        queryFn: getStatus,
         refetchInterval: 5000,
-    })
+    });
 
-    const currentTime = new Date().toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-    })
+    const isRunning = status?.running;
 
     return (
-        <header className="h-16 bg-gray-900 border-b border-gray-800 px-6 flex items-center justify-between">
-            {/* Left Section - Search */}
-            <div className="flex items-center gap-4 flex-1">
-                <div className="relative max-w-md w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                        type="text"
-                        placeholder="Search commands, examples, or documentation..."
-                        className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                </div>
+        <header className="bg-gray-900/80 backdrop-blur-md border-b border-gray-800 p-4 flex justify-between items-center sticky top-0 z-40 h-16">
+            <div>
+                {/* Logo veya Proje Adı (Sidebar'da olduğu için burada minimal tuttuk) */}
+                <h1 className="text-lg font-bold text-white">
+                    <Link to="/dashboard">OVERSEER</Link>
+                </h1>
             </div>
 
-            {/* Center Section - Status */}
             <div className="flex items-center gap-6">
-                <motion.div
-                    className="flex items-center gap-3 px-4 py-2 bg-gray-800 rounded-lg"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                >
-                    <div className="flex items-center gap-2">
-                        <GitBranch className="w-4 h-4 text-primary-400" />
-                        <span className="text-sm font-medium text-gray-300">ROS2 Humble</span>
+                {/* Sistem Durum Göstergeleri */}
+                <div className="flex items-center gap-4 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg">
+                    <div className="flex items-center gap-2" title="ROS Durumu">
+                        <GitBranch className="w-4 h-4 text-purple-400" />
+                        <span className="text-xs font-medium text-gray-300">ROS2 Humble</span>
                     </div>
                     <div className="w-px h-4 bg-gray-700" />
-                    <div className="flex items-center gap-2">
-                        {status?.status === 'RUNNING' ? (
-                            <>
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                                <span className="text-sm font-medium text-green-400">Simulation Active</span>
-                            </>
-                        ) : (
-                            <>
-                                <div className="w-2 h-2 bg-gray-500 rounded-full" />
-                                <span className="text-sm font-medium text-gray-400">Simulation Idle</span>
-                            </>
-                        )}
+                    <div className="flex items-center gap-2" title="Simülasyon Durumu">
+                        <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
+                        <span className={`text-xs font-medium ${isRunning ? 'text-green-400' : 'text-red-400'}`}>
+                            {isRunning ? 'ACTIVE' : 'INACTIVE'}
+                        </span>
                     </div>
-                </motion.div>
-            </div>
-
-            {/* Right Section - Actions */}
-            <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-400">{currentTime}</span>
-
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="relative p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                >
-                    <Bell className="w-5 h-5" />
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full" />
-                </motion.button>
-
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                >
-                    <Info className="w-5 h-5" />
-                </motion.button>
-
-                <div className="w-px h-8 bg-gray-800" />
-
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center gap-2 px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                >
-                    <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center">
-                        <User className="w-4 h-4 text-white" />
+                    <div className="w-px h-4 bg-gray-700" />
+                    <div className="flex items-center gap-2" title="Bağlantı">
+                        <Wifi className={`w-4 h-4 ${isRunning ? 'text-green-400' : 'text-red-500'}`} />
+                        <span className="text-xs font-medium text-gray-300">
+                            {isRunning ? 'Online' : 'Offline'}
+                        </span>
                     </div>
-                    <span className="text-sm font-medium">Admin</span>
-                </motion.button>
+                </div>
 
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-colors"
-                >
-                    <Power className="w-5 h-5" />
-                </motion.button>
+                {/* Kullanıcı ve Bildirimler */}
+                <div className="flex items-center gap-3">
+                    <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors">
+                        <Bell className="w-5 h-5" />
+                    </button>
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full" />
+                </div>
             </div>
         </header>
-    )
-}
+    );
+};
 
-export default Topbar
+export default Topbar;

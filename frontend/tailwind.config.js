@@ -1,27 +1,40 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-    content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
+    content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
     theme: {
         extend: {
             colors: {
-                // "primary" rengini kullandığın tüm sınıflar için tanımlıyoruz
                 primary: {
-                    50:  '#eff6ff',
-                    100: '#dbeafe',
-                    200: '#bfdbfe',
-                    300: '#93c5fd',
-                    400: '#60a5fa',
-                    500: '#3b82f6',
-                    600: '#2563eb',
-                    700: '#1d4ed8',
-                    800: '#1e40af',
-                    900: '#1e3a8a',
+                    DEFAULT: '#00A9FF',
+                    light: '#89CFF3',
+                    dark: '#008DDB',
+                },
+                gray: {
+                    950: '#0A0E1A',
+                    900: '#111827',
+                    800: '#1F2937',
+                    700: '#374151',
+                    // Diğer gri tonları tailwind'in varsayılanını kullanır
+                },
+                glow: {
+                    blue: 'rgba(0, 169, 255, 0.5)',
+                    purple: 'rgba(138, 43, 226, 0.5)',
                 },
             },
-            borderColor: {
-                border: 'hsl(var(--border, 215 16% 27%))',
+            boxShadow: {
+                'glow-blue': '0 0 15px rgba(0, 169, 255, 0.4)',
+                'glow-purple': '0 0 15px rgba(138, 43, 226, 0.4)',
+            },
+            animation: {
+                'subtle-float': 'subtle-float 6s ease-in-out infinite',
+            },
+            keyframes: {
+                'subtle-float': {
+                    '0%, 100%': { transform: 'translateY(0px)' },
+                    '50%': { transform: 'translateY(-10px)' },
+                },
             },
         },
     },
     plugins: [],
-}
+};

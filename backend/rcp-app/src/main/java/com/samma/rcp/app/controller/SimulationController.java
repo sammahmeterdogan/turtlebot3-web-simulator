@@ -1,7 +1,10 @@
 package com.samma.rcp.app.controller;
 
-import com.samma.rcp.app.domain.SimStatusDto;
+import com.samma.rcp.app.dto.SimStatusDto;
+import com.samma.rcp.app.dto.SimulationStartRequest;
 import com.samma.rcp.app.service.SimulationService;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -15,17 +18,17 @@ public class SimulationController {
     }
 
     @PostMapping("/start")
-    public SimStatusDto start() {
-        return service.start();
+    public ResponseEntity<SimStatusDto> start(@Valid @RequestBody SimulationStartRequest request) {
+        return ResponseEntity.ok(service.start(request));
     }
 
     @PostMapping("/stop")
-    public SimStatusDto stop() {
-        return service.stop();
+    public ResponseEntity<SimStatusDto> stop() {
+        return ResponseEntity.ok(service.stop());
     }
 
     @GetMapping("/status")
-    public SimStatusDto status() {
-        return service.status();
+    public ResponseEntity<SimStatusDto> status() {
+        return ResponseEntity.ok(service.getStatus());
     }
 }

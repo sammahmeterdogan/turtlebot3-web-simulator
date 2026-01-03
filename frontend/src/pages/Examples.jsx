@@ -1,243 +1,77 @@
-import React, { useState } from 'react'
-import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
-import {
-    Play,
-    Info,
-    Clock,
-    Cpu,
-    Filter,
-    Search,
-    ChevronRight,
-    Gamepad2,
-    Map,
-    Navigation,
-    Shield,
-    Users,
-    Route,
-    GitBranch,
-    Target,
-    Grid3x3,
-    BookOpen,
-    Video,
-    Code
-} from 'lucide-react'
-import PageContainer from '../components/layout/PageContainer'
-import { examplesAPI, simulationAPI } from '../services/api'
-
-const getIconForCategory = (category) => {
-    const icons = {
-        BASIC: Gamepad2,
-        MAPPING: Map,
-        NAVIGATION: Navigation,
-        AUTONOMOUS: Shield,
-        VISION: Users,
-        CONTROL: Target,
-        ADVANCED: Grid3x3
-    }
-    return icons[category] || Cpu
-}
-
-const getDifficultyBadge = (difficulty) => {
-    const styles = {
-        EASY: 'bg-green-900/50 text-green-400 border-green-800',
-        MEDIUM: 'bg-yellow-900/50 text-yellow-400 border-yellow-800',
-        HARD: 'bg-red-900/50 text-red-400 border-red-800'
-    }
-    return styles[difficulty] || styles.MEDIUM
-}
+import React from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { Code, Tags, Play, Cpu } from 'lucide-react';
+import { motion } from 'framer-motion';
+import PageContainer from '../components/layout/PageContainer';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { getExamples, launchExample } from '../services/api'; // Düzeltilmiş import
 
 const Examples = () => {
-    const navigate = useNavigate()
-    const [searchQuery, setSearchQuery] = useState('')
-    const [selectedCategory, setSelectedCategory] = useState('ALL')
-    const [selectedDifficulty, setSelectedDifficulty] = useState('ALL')
-
-    const { data: examples, isLoading } = useQuery({
+    const navigate = useNavigate();
+    const { data: examples, isLoading, error } = useQuery({
         queryKey: ['examples'],
-        queryFn: examplesAPI.list,
-    })
+        queryFn: getExamples,
+    });
 
-    const launchExample = useMutation({
-        mutationFn: (exampleId) => examplesAPI.launch(exampleId),
+    const launchMutation = useMutation({
+        mutationFn: (exampleId) => launchExample(exampleId),
         onSuccess: () => {
-            toast.success('Example launched successfully')
-            navigate('/simulator')
+            toast.success('Example launched! Redirecting to simulator...');
+            navigate('/simulator');
         },
-        onError: () => {
-            toast.error('Failed to launch example')
+        onError: (err) => {
+            toast.error(err.message || 'Failed to launch example.');
         }
-    })
+    });
 
-    const categories = ['ALL', 'BASIC', 'MAPPING', 'NAVIGATION', 'AUTONOMOUS', 'VISION', 'CONTROL', 'ADVANCED']
-    const difficulties = ['ALL', 'EASY', 'MEDIUM', 'HARD']
-
-    const filteredExamples = examples?.filter(example => {
-        const matchesSearch = example.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            example.description.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesCategory = selectedCategory === 'ALL' || example.category === selectedCategory
-        const matchesDifficulty = selectedDifficulty === 'ALL' || example.difficulty === selectedDifficulty
-
-        return matchesSearch && matchesCategory && matchesDifficulty
-    })
+    if (error) return <div>Error loading examples: {error.message}</div>;
 
     return (
-        <PageContainer
-            title="Example Scenarios"
-            description="Pre-configured TurtleBot3 examples and demonstrations"
-        >
-            {/* Filters */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Search */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                        <input
-                            type="text"
-                            placeholder="Search examples..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        />
-                    </div>
-
-                    {/* Category Filter */}
-                    <div className="flex items-center gap-2">
-                        <Filter className="w-4 h-4 text-gray-500" />
-                        <select
-                            value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value)}
-                            className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            {categories.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Difficulty Filter */}
-                    <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-gray-500" />
-                        <select
-                            value={selectedDifficulty}
-                            onChange={(e) => setSelectedDifficulty(e.target.value)}
-                            className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            {difficulties.map(diff => (
-                                <option key={diff} value={diff}>{diff}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {/* Examples Grid */}
+        <PageContainer title="Code Examples" description="Explore and run various pre-built scenarios.">
             {isLoading ? (
                 <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <Cpu className="w-12 h-12 text-gray-600 mx-auto mb-4 animate-spin" />
-                        <p className="text-gray-400">Loading examples...</p>
-                    </div>
+                    <LoadingSpinner size="large" />
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredExamples?.map((example, index) => {
-                        const Icon = getIconForCategory(example.category)
-
-                        return (
-                            <motion.div
-                                key={example.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                                whileHover={{ y: -4 }}
-                                className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden hover:border-gray-700 transition-all"
-                            >
-                                {/* Card Header */}
-                                <div className="p-4 border-b border-gray-800">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div className="p-2 bg-primary-500/10 rounded-lg">
-                                            <Icon className="w-6 h-6 text-primary-400" />
-                                        </div>
-                                        <span className={`px-2 py-1 text-xs rounded-full border ${getDifficultyBadge(example.difficulty)}`}>
-                      {example.difficulty}
-                    </span>
-                                    </div>
-
-                                    <h3 className="text-white font-semibold mb-1">{example.title}</h3>
-                                    <p className="text-gray-400 text-sm line-clamp-2">{example.description}</p>
+                    {examples.map((example, index) => (
+                        <motion.div
+                            key={example.key || index} // 'key' prop eklendi
+                            className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col hover:border-blue-500/50 transition-colors"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                        >
+                            <div className="p-6 flex-grow">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Cpu className="w-6 h-6 text-blue-400" />
+                                    <h3 className="text-xl font-bold text-gray-100">{example.title}</h3>
                                 </div>
-
-                                {/* Card Body */}
-                                <div className="p-4">
-                                    {/* Category Badge */}
-                                    <div className="flex items-center gap-2 mb-4">
-                    <span className="px-2 py-1 bg-gray-800 text-gray-300 text-xs rounded">
-                      {example.category}
-                    </span>
-                                        {example.enabled && (
-                                            <span className="px-2 py-1 bg-green-900/50 text-green-400 text-xs rounded">
-                        Available
-                      </span>
-                                        )}
-                                    </div>
-
-                                    {/* Action Buttons */}
-                                    <div className="flex gap-2">
-                                        <motion.button
-                                            whileTap={{ scale: 0.95 }}
-                                            onClick={() => launchExample.mutate(example.id)}
-                                            disabled={!example.enabled || launchExample.isPending}
-                                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
-                                        >
-                                            <Play className="w-4 h-4" />
-                                            Launch
-                                        </motion.button>
-
-                                        <motion.button
-                                            whileTap={{ scale: 0.95 }}
-                                            className="p-2 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg transition-colors"
-                                            title="View Details"
-                                        >
-                                            <Info className="w-4 h-4" />
-                                        </motion.button>
-                                    </div>
+                                <p className="text-gray-400 mb-4 text-sm">{example.description || 'No description available.'}</p>
+                                <div className="flex items-center gap-2">
+                                    <Tags size={16} className="text-gray-500" />
+                                    <span className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-full">{example.category || 'GENERAL'}</span>
+                                    <span className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded-full">{example.difficulty || 'MEDIUM'}</span>
                                 </div>
-
-                                {/* Card Footer - Quick Actions */}
-                                <div className="px-4 pb-4 flex items-center gap-2">
-                                    <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">
-                                        <BookOpen className="w-3 h-3" />
-                                        Docs
-                                    </button>
-                                    <span className="text-gray-700">•</span>
-                                    <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">
-                                        <Video className="w-3 h-3" />
-                                        Tutorial
-                                    </button>
-                                    <span className="text-gray-700">•</span>
-                                    <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">
-                                        <Code className="w-3 h-3" />
-                                        Code
-                                    </button>
-                                </div>
-                            </motion.div>
-                        )
-                    })}
-                </div>
-            )}
-
-            {filteredExamples?.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-64 text-center">
-                    <Search className="w-12 h-12 text-gray-600 mb-4" />
-                    <p className="text-gray-400 mb-2">No examples found</p>
-                    <p className="text-gray-500 text-sm">Try adjusting your filters</p>
+                            </div>
+                            <div className="bg-gray-800/50 p-4 mt-auto">
+                                <button
+                                    onClick={() => launchMutation.mutate(example.key)}
+                                    disabled={launchMutation.isPending}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-600"
+                                >
+                                    <Play size={18} />
+                                    {launchMutation.isPending && launchMutation.variables === example.key ? 'Launching...' : 'Run in Simulator'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    ))}
                 </div>
             )}
         </PageContainer>
-    )
-}
+    );
+};
 
-export default Examples
+export default Examples;

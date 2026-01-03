@@ -1,4 +1,4 @@
-# ros-stack/docker-compose.yml  (FINAL - dosyanın KENDİ klasörü baz alınır)
+# ros-stack/docker-compose.yml
 services:
   rosbridge:
     build:
@@ -12,6 +12,20 @@ services:
     ports:
       - "${ROS_BRIDGE_PORT:-9090}:9090"
     networks: [rosnet]
+
+  # --- YENİ ---
+  # Turtlesim servisi eklendi
+  turtlesim:
+    build:
+      context: .
+      dockerfile: turtlesim.Dockerfile
+    container_name: turtlesim
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-42}
+    depends_on: [rosbridge]
+    networks: [rosnet]
+  # --- YENİ SON ---
 
   tb3-sim:
     build:
